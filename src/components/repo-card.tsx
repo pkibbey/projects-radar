@@ -1,25 +1,77 @@
+"use client";
+
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { ExternalLink, Lightbulb, ListChecks } from "lucide-react";
 import { RepositoryBundle } from "@/lib/github";
 import { RepoAnalysis } from "@/lib/ai";
+import { cn } from "@/lib/utils";
+import { ViewMode } from "@/lib/view-modes";
 import { RepoStatusBadge } from "@/components/repo-status-badge";
 import { RepoActionsList } from "@/components/repo-actions-list";
+import { RepoIntelligenceRefreshButton } from "@/components/repo-intelligence-refresh-button";
 
 export type RepoCardProps = {
   bundle: RepositoryBundle;
   analysis: RepoAnalysis;
+  mode: ViewMode;
+  id?: string;
 };
 
-export const RepoCard = ({ bundle, analysis }: RepoCardProps) => {
+export const RepoCard = ({ bundle, analysis, mode, id }: RepoCardProps) => {
   const { meta } = bundle;
   const lastUpdatedText = formatDistanceToNow(new Date(meta.pushedAt), {
     addSuffix: true,
   });
 
+  const isList = mode === "list";
+  const isCompact = mode === "compact";
+  const isExpanded = mode === "expanded";
+  const isDetailed = mode === "detailed";
+
+  const showMetrics = !isList;
+  const showInsights = !isList && !isCompact;
+  const showActions = mode === "regular" || isExpanded || isDetailed;
+  const insightLimit = isDetailed ? undefined : isExpanded ? 5 : 3;
+  const insights = showInsights
+    ? insightLimit
+      ? analysis.insights.slice(0, insightLimit)
+      : analysis.insights
+    : [];
+  const showTopics = (isExpanded || isDetailed) && meta.topics.length > 0;
+
+  const cardSpacing = isList ? "gap-4 p-4" : isCompact ? "gap-5 p-5" : "gap-6 p-6";
+  const detailButtonSize = isList || isCompact ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm";
+  const refreshButtonSize = isList || isCompact ? "sm" : "md";
+  const descriptionTone = isList ? "text-xs" : "text-sm";
+
+  const metrics: string[] = [
+    `⭐ ${meta.stars.toLocaleString()} stars`,
+    `🍴 ${meta.forks.toLocaleString()} forks`,
+    `🐞 ${meta.openIssues.toLocaleString()} open issues`,
+  ];
+  if (!isCompact) {
+    metrics.splice(2, 0, `👀 ${meta.watchers.toLocaleString()} watchers`);
+  }
+  if (meta.primaryLanguage) {
+    metrics.push(`💻 ${meta.primaryLanguage}`);
+  }
+
   return (
-    <article className="flex flex-col gap-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+    <article
+      id={id}
+      className={cn(
+        "flex flex-col rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900",
+        cardSpacing,
+        "scroll-mt-42"
+      )}
+    >
+      <header
+        className={cn(
+          "flex flex-wrap items-start justify-between gap-3",
+          isList && "gap-2",
+        )}
+      >
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <RepoStatusBadge status={meta.status} />
@@ -30,60 +82,96 @@ export const RepoCard = ({ bundle, analysis }: RepoCardProps) => {
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
             {meta.displayName}
           </h2>
-          <p className="max-w-2xl text-sm text-slate-600 dark:text-slate-300">
+          <p
+            className={cn(
+              "max-w-2xl text-slate-600 dark:text-slate-300",
+              descriptionTone,
+            )}
+          >
             {meta.description ?? "No description provided."}
           </p>
         </div>
-        <Link
-          href={`/repos/${meta.owner}/${meta.name}`}
-          className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-        >
-          View details
-          <ExternalLink className="h-4 w-4" />
-        </Link>
+        <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-start">
+          <RepoIntelligenceRefreshButton
+            owner={meta.owner}
+            repo={meta.name}
+            size={refreshButtonSize}
+          />
+          <Link
+            href={`/repos/${meta.owner}/${meta.name}`}
+            className={cn(
+              "inline-flex items-center gap-2 rounded-full border border-slate-200 font-medium text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800",
+              detailButtonSize,
+            )}
+          >
+            View details
+            <ExternalLink className="h-4 w-4" />
+          </Link>
+        </div>
       </header>
 
-      <section className="grid gap-4 md:grid-cols-[2fr_1fr]">
+      <section
+        className={cn(
+          "grid gap-4",
+          showActions ? "md:grid-cols-[2fr_1fr]" : "",
+        )}
+      >
         <div className="space-y-4">
-          <div className="flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-300">
-            <span>⭐ {meta.stars.toLocaleString()} stars</span>
-            <span>🍴 {meta.forks.toLocaleString()} forks</span>
-            <span>👀 {meta.watchers.toLocaleString()} watchers</span>
-            <span>🐞 {meta.openIssues.toLocaleString()} open issues</span>
-            {meta.primaryLanguage && <span>💻 {meta.primaryLanguage}</span>}
-          </div>
+          {showMetrics && (
+            <div
+              className={cn(
+                "flex flex-wrap gap-3 text-xs sm:text-sm text-slate-600 dark:text-slate-300",
+                isCompact && "text-xs",
+              )}
+            >
+              {metrics.map((item) => (
+                <span key={item}>{item}</span>
+              ))}
+            </div>
+          )}
+
           <div>
             <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
               <Lightbulb className="h-4 w-4" /> AI Summary
             </h3>
-            <p className="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-200">
+            <p
+              className={cn(
+                "leading-relaxed text-slate-700 dark:text-slate-200",
+                isList ? "mt-1 text-sm" : "mt-2 text-sm",
+              )}
+            >
               {analysis.summary}
             </p>
           </div>
-          <div className="space-y-2">
-            <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
-              <ListChecks className="h-4 w-4" /> Key insights
-            </h3>
-            <ul className="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
-              {analysis.insights.map((insight) => (
-                <li
-                  key={insight.title}
-                  className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800"
-                >
-                  <p className="font-medium">{insight.title}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {insight.description}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </div>
+
+          {insights.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+                <ListChecks className="h-4 w-4" /> Key insights
+              </h3>
+              <ul className="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
+                {insights.map((insight) => (
+                  <li
+                    key={insight.title}
+                    className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800"
+                  >
+                    <p className="font-medium">{insight.title}</p>
+                    {(isExpanded || isDetailed) && (
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        {insight.description}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
-        <RepoActionsList actions={analysis.actions} />
+        {showActions && <RepoActionsList actions={analysis.actions} />}
       </section>
 
-      {meta.topics.length > 0 && (
+      {showTopics && (
         <footer className="flex flex-wrap gap-2">
           {meta.topics.map((topic) => (
             <span

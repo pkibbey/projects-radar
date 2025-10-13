@@ -5,7 +5,11 @@ import remarkGfm from "remark-gfm";
 import { ArrowLeft, ExternalLink, Lightbulb } from "lucide-react";
 import { projectConfig } from "@/config/projects";
 import { fetchRepositoryBundle } from "@/lib/github";
-import { generateRepoAnalysis } from "@/lib/ai";
+import {
+  buildFallback,
+  generateRepoAnalysis,
+  loadCachedRepoAnalysis,
+} from "@/lib/ai";
 import { getGitHubToken } from "@/lib/env";
 import { RepoStatusBadge } from "@/components/repo-status-badge";
 import { RepoActionsList } from "@/components/repo-actions-list";
@@ -54,10 +58,34 @@ export default async function RepoPage({ params }: RepoPageProps) {
 
   const token = getGitHubToken();
   const bundle = await fetchRepositoryBundle(entry, token ?? undefined);
-  const analysis = await generateRepoAnalysis(bundle, {
-    entry,
-    token,
-  });
+  const cachedAnalysis = loadCachedRepoAnalysis(bundle);
+
+  if (!cachedAnalysis && token) {
+    void generateRepoAnalysis(bundle, {
+      entry,
+      token,
+    })
+      .then(() => {
+        console.info(
+          `[ai] Generated project intelligence for ${entry.owner}/${entry.repo}.`,
+        );
+      })
+      .catch((error) => {
+        console.error(
+          `[ai] Failed to generate project intelligence for ${entry.owner}/${entry.repo}.`,
+          error,
+        );
+      });
+  }
+
+  const analysis =
+    cachedAnalysis ??
+    buildFallback(
+      bundle,
+      token
+        ? "AI analysis is being generated. Refresh shortly to view new insights."
+        : "Provide GITHUB_TOKEN and AI credentials to enable project intelligence generation.",
+    );
   const { meta, documents } = bundle;
 
   return (

@@ -30,6 +30,16 @@ export type RepoAnalysis = {
 };
 
 const INTELLIGENCE_FILENAME = "PROJECT_INTELLIGENCE.md";
+const LM_STUDIO_FAILURE_MESSAGE =
+  "The dashboard could not connect to the local LM Studio server. Start LM Studio on http://localhost:1234 or update AI configuration.";
+
+type ProviderHealth = {
+  status: "unknown" | "ready" | "failed";
+  message?: string;
+};
+
+let providerHealth: ProviderHealth = { status: "unknown" };
+let loggedProviderFailure = false;
 
 const FALLBACK_ANALYSIS: RepoAnalysis = {
   summary:
@@ -162,6 +172,35 @@ const buildIntelligenceMarkdown = (bundle: RepositoryBundle, analysis: RepoAnaly
   return `${header}${summarySection}${insightsSection}${actionsSection}${jsonBlock}`;
 };
 
+const isConnectionError = (error: unknown): boolean => {
+  if (!error) {
+    return false;
+  }
+
+  if (error instanceof AggregateError) {
+    return error.errors.some(isConnectionError);
+  }
+
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    if (message.includes("fetch failed") || message.includes("connection error")) {
+      return true;
+    }
+    if (error.cause) {
+      return isConnectionError(error.cause);
+    }
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const code = (error as { code?: string }).code;
+    if (code === "ECONNREFUSED") {
+      return true;
+    }
+  }
+
+  return false;
+};
+
 export const generateRepoAnalysis = async (
   bundle: RepositoryBundle,
   context?: {
@@ -192,6 +231,10 @@ export const generateRepoAnalysis = async (
     baseURL: provider === "lmstudio" ? getLmStudioUrl() : getOpenAIBaseUrl(),
   });
 
+  if (provider === "lmstudio" && providerHealth.status === "failed") {
+    return buildFallback(bundle, providerHealth.message ?? LM_STUDIO_FAILURE_MESSAGE);
+  }
+
   try {
     const input = `You are an engineering operations co-pilot. Analyze the following repository context and respond with JSON using the shape {"summary": string, "insights": Array<{"title": string, "description": string}>, "actions": Array<{"title": string, "instruction": string}>}. Each insight should be concise but actionable. Focus on project health, potential risks, and next steps. Context:\n\n${prepareContext(bundle)}`;
 
@@ -200,6 +243,9 @@ export const generateRepoAnalysis = async (
       input,
       max_output_tokens: 800,
     });
+
+    providerHealth = { status: "ready" };
+    loggedProviderFailure = false;
 
     const text = response.output_text;
     if (!text) {
@@ -230,15 +276,21 @@ export const generateRepoAnalysis = async (
 
     return analysis;
   } catch (error) {
+    if (provider === "lmstudio" && isConnectionError(error)) {
+      providerHealth = {
+        status: "failed",
+        message: LM_STUDIO_FAILURE_MESSAGE,
+      };
+      if (!loggedProviderFailure) {
+        console.error("generateRepoAnalysis connection error", error);
+        loggedProviderFailure = true;
+      }
+      return buildFallback(bundle, LM_STUDIO_FAILURE_MESSAGE);
+    }
+
     console.error("generateRepoAnalysis error", error);
     if (error instanceof GitHubError) {
       return buildFallback(bundle, error.message);
-    }
-    if (provider === "lmstudio") {
-      return buildFallback(
-        bundle,
-        "The dashboard could not connect to the local LM Studio server. Start LM Studio on http://localhost:1234 or update AI configuration.",
-      );
     }
     return buildFallback(bundle);
   }
