@@ -11,6 +11,7 @@ import {
 import { getGitHubToken } from "@/lib/env";
 import { RepoCard } from "@/components/repo-card";
 import { ViewModeSwitcher } from "@/components/view-mode-switcher";
+import { SortSelector, type SortKey } from "@/components/sort-selector";
 import { cn } from "@/lib/utils";
 import {
   DEFAULT_VIEW_MODE,
@@ -23,24 +24,21 @@ export const revalidate = 60;
 const gridLayoutByMode: Record<ViewMode, string> = {
   list: "grid-cols-1",
   compact: "grid-cols-1 sm:grid-cols-2",
-  regular: "grid-cols-1 lg:grid-cols-2",
   expanded: "grid-cols-1",
-  detailed: "grid-cols-1",
 };
 
 const gridGapByMode: Record<ViewMode, string> = {
   list: "gap-4",
   compact: "gap-5",
-  regular: "gap-6",
   expanded: "gap-8",
-  detailed: "gap-8",
 };
 
 type DashboardContentProps = {
   viewMode: ViewMode;
+  sortMode?: "name" | "stars" | "updated" | "completeness";
 };
 
-async function DashboardContent({ viewMode }: DashboardContentProps) {
+async function DashboardContent({ viewMode, sortMode }: DashboardContentProps) {
   const token = getGitHubToken();
   const generationTasks: Promise<void>[] = [];
 
@@ -93,12 +91,31 @@ async function DashboardContent({ viewMode }: DashboardContentProps) {
   const errors = loadResults.filter((result) => "error" in result) as Array<{
     error: string;
   }>;
+
   const projects = loadResults.filter(
     (result): result is { bundle: Awaited<ReturnType<typeof fetchRepositoryBundle>>; analysis: Awaited<ReturnType<typeof generateRepoAnalysis>> } =>
       "bundle" in result,
   );
 
-  const navItems = projects.map(({ bundle }) => ({
+  const sortedProjects = projects.slice().sort((a, b) => {
+    if (sortMode === "stars") {
+      return b.bundle.meta.stars - a.bundle.meta.stars;
+    }
+    if (sortMode === "updated") {
+      return (
+        new Date(b.bundle.meta.pushedAt).getTime() - new Date(a.bundle.meta.pushedAt).getTime()
+      );
+    }
+    if (sortMode === "completeness") {
+      const as = a.bundle.meta.completenessScore ?? 0;
+      const bs = b.bundle.meta.completenessScore ?? 0;
+      return bs - as;
+    }
+    // default name sort
+    return a.bundle.meta.displayName.localeCompare(b.bundle.meta.displayName);
+  });
+
+  const navItems = sortedProjects.map(({ bundle }) => ({
     id: `${bundle.meta.owner}-${bundle.meta.name}`,
     label: bundle.meta.displayName,
   }));
@@ -207,7 +224,7 @@ async function DashboardContent({ viewMode }: DashboardContentProps) {
       </section>
 
       <div className={cn("grid", gridGapByMode[viewMode], gridLayoutByMode[viewMode])}>
-        {projects.map(({ bundle, analysis }) => (
+        {sortedProjects.map(({ bundle, analysis }) => (
           <RepoCard
             key={`${bundle.meta.owner}/${bundle.meta.name}`}
             bundle={bundle}
@@ -230,6 +247,8 @@ export default async function Home({ searchParams }: HomeProps) {
   const rawView = Array.isArray(resolvedParams.view)
     ? resolvedParams.view[0]
     : resolvedParams.view;
+  const rawSort = Array.isArray(resolvedParams.sort) ? resolvedParams.sort[0] : resolvedParams.sort;
+  const sortMode = rawSort === "stars" || rawSort === "updated" || rawSort === "completeness" ? rawSort : "name";
   const viewMode = isViewMode(rawView) ? rawView : DEFAULT_VIEW_MODE;
 
   return (
@@ -249,11 +268,14 @@ export default async function Home({ searchParams }: HomeProps) {
             </p>
           )}
         </div>
-        <ViewModeSwitcher value={viewMode} />
+        <div className="flex items-center gap-4">
+          <SortSelector value={sortMode as SortKey} />
+          <ViewModeSwitcher value={viewMode} />
+        </div>
       </header>
 
       <Suspense fallback={<p className="text-sm text-slate-500">Loading repositories…</p>}>
-        <DashboardContent viewMode={viewMode} />
+        <DashboardContent viewMode={viewMode} sortMode={sortMode as SortKey} />
       </Suspense>
     </div>
   );

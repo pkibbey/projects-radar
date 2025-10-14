@@ -10,6 +10,7 @@ import { ViewMode } from "@/lib/view-modes";
 import { RepoStatusBadge } from "@/components/repo-status-badge";
 import { RepoActionsList } from "@/components/repo-actions-list";
 import { RepoIntelligenceRefreshButton } from "@/components/repo-intelligence-refresh-button";
+import { CompletenessIndicator } from "@/components/completeness-indicator";
 
 export type RepoCardProps = {
   bundle: RepositoryBundle;
@@ -27,18 +28,17 @@ export const RepoCard = ({ bundle, analysis, mode, id }: RepoCardProps) => {
   const isList = mode === "list";
   const isCompact = mode === "compact";
   const isExpanded = mode === "expanded";
-  const isDetailed = mode === "detailed";
 
   const showMetrics = !isList;
   const showInsights = !isList && !isCompact;
-  const showActions = mode === "regular" || isExpanded || isDetailed;
-  const insightLimit = isDetailed ? undefined : isExpanded ? 5 : 3;
+  const showActions = isExpanded;
+  const insightLimit = isExpanded ? undefined : 3;
   const insights = showInsights
     ? insightLimit
       ? analysis.insights.slice(0, insightLimit)
       : analysis.insights
     : [];
-  const showTopics = (isExpanded || isDetailed) && meta.topics.length > 0;
+  const showTopics = isExpanded && meta.topics.length > 0;
 
   const cardSpacing = isList ? "gap-4 p-4" : isCompact ? "gap-5 p-5" : "gap-6 p-6";
   const detailButtonSize = isList || isCompact ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm";
@@ -75,6 +75,12 @@ export const RepoCard = ({ bundle, analysis, mode, id }: RepoCardProps) => {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <RepoStatusBadge status={meta.status} />
+            {typeof meta.completenessScore === 'number' && (
+              <CompletenessIndicator 
+                score={meta.completenessScore} 
+                size={isList || isCompact ? "sm" : "md"}
+              />
+            )}
             <span className="text-xs text-slate-500 dark:text-slate-400">
               Updated {lastUpdatedText}
             </span>
@@ -156,7 +162,7 @@ export const RepoCard = ({ bundle, analysis, mode, id }: RepoCardProps) => {
                     className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800"
                   >
                     <p className="font-medium">{insight.title}</p>
-                    {(isExpanded || isDetailed) && (
+                    {isExpanded && (
                       <p className="text-xs text-slate-500 dark:text-slate-400">
                         {insight.description}
                       </p>

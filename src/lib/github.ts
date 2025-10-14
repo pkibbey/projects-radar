@@ -31,6 +31,7 @@ export type RepositoryBundle = {
     hasDiscussions: boolean;
     watchers: number;
     license: string | null;
+    completenessScore?: number;
   };
   documents: RepoDocument[];
 };
@@ -63,6 +64,72 @@ const computeStatus = (pushedAt: string, archived: boolean): RepoStatus => {
   if (daysSincePush <= 14) return "active";
   if (daysSincePush <= 60) return "maintenance";
   return "stale";
+};
+
+const computeCompletenessScore = (
+  repoData: { 
+    description?: string | null; 
+    license?: { name: string } | null; 
+    topics?: string[]; 
+    stargazers_count: number; 
+    pushed_at: string;
+  },
+  documents: RepoDocument[]
+): number => {
+  let score = 0;
+  const weights = {
+    description: 10,
+    readme: 20,
+    license: 10,
+    topics: 10,
+    hasProjectFile: 15,
+    hasAnalysisFile: 15,
+    stars: 10,
+    recent_activity: 10,
+  };
+
+  // Description exists
+  if (repoData.description?.trim()) {
+    score += weights.description;
+  }
+
+  // README exists
+  if (documents.some(doc => doc.path.toLowerCase().includes('readme'))) {
+    score += weights.readme;
+  }
+
+  // License exists
+  if (repoData.license) {
+    score += weights.license;
+  }
+
+  // Has topics/tags
+  if (Array.isArray(repoData.topics) && repoData.topics.length > 0) {
+    score += weights.topics;
+  }
+
+  // Has project-related files
+  if (documents.some(doc => doc.path.includes('PROJECT'))) {
+    score += weights.hasProjectFile;
+  }
+
+  // Has analysis files
+  if (documents.some(doc => doc.path.includes('TODO') || doc.path.includes('ANALYSIS'))) {
+    score += weights.hasAnalysisFile;
+  }
+
+  // Has community engagement (stars)
+  if (repoData.stargazers_count > 0) {
+    score += weights.stars;
+  }
+
+  // Recent activity
+  const daysSincePush = differenceInDays(new Date(), new Date(repoData.pushed_at));
+  if (daysSincePush <= 30) {
+    score += weights.recent_activity;
+  }
+
+  return Math.min(100, Math.round(score));
 };
 
 export class GitHubError extends Error {
@@ -121,6 +188,8 @@ export const fetchRepositoryBundle = async (
     }
   }
 
+  const completenessScore = computeCompletenessScore(repoData, documents);
+
   return {
     meta: {
       owner,
@@ -140,6 +209,7 @@ export const fetchRepositoryBundle = async (
       hasDiscussions: Boolean(repoData.has_discussions),
       watchers: repoData.subscribers_count ?? 0,
       license: repoData.license?.name ?? null,
+      completenessScore,
     },
     documents,
   };
