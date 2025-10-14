@@ -146,7 +146,7 @@ export const fetchRepositoryBundle = async (
   entry: ProjectConfigEntry,
   token?: string,
 ): Promise<RepositoryBundle> => {
-  const { owner, repo, branch, displayName } = entry;
+  const { owner, repo, branch, displayName, fetchDocuments = true } = entry;
   const headers = createHeaders(token);
 
   const repoResponse = await fetch(`${GITHUB_API}/repos/${owner}/${repo}`, {
@@ -164,27 +164,31 @@ export const fetchRepositoryBundle = async (
   const repoData = await repoResponse.json();
 
   const documents: RepoDocument[] = [];
-  for (const path of DEFAULT_FILES) {
-    const fileResponse = await fetch(
-      `${GITHUB_API}/repos/${owner}/${repo}/contents/${path}${branch ? `?ref=${branch}` : ""}`,
-      {
-        headers,
-        next: { revalidate: 300 },
-      },
-    );
+  
+  // Only fetch documents if enabled (default: true)
+  if (fetchDocuments && DEFAULT_FILES.length > 0) {
+    for (const path of DEFAULT_FILES) {
+      const fileResponse = await fetch(
+        `${GITHUB_API}/repos/${owner}/${repo}/contents/${path}${branch ? `?ref=${branch}` : ""}`,
+        {
+          headers,
+          next: { revalidate: 300 },
+        },
+      );
 
-    if (!fileResponse.ok) {
-      continue;
-    }
+      if (!fileResponse.ok) {
+        continue;
+      }
 
-    const fileData = await fileResponse.json();
-    if (fileData.type === "file" && typeof fileData.content === "string") {
-      documents.push({
-        path,
-        content: decodeBase64(fileData.content),
-        url: fileData.html_url,
-        sha: fileData.sha,
-      });
+      const fileData = await fileResponse.json();
+      if (fileData.type === "file" && typeof fileData.content === "string") {
+        documents.push({
+          path,
+          content: decodeBase64(fileData.content),
+          url: fileData.html_url,
+          sha: fileData.sha,
+        });
+      }
     }
   }
 
@@ -213,90 +217,4 @@ export const fetchRepositoryBundle = async (
     },
     documents,
   };
-};
-
-type UpsertDocumentParams = {
-  entry: ProjectConfigEntry;
-  token: string;
-  path: string;
-  content: string;
-  message?: string;
-  sha?: string;
-};
-
-export const upsertRepositoryDocument = async ({
-  entry,
-  token,
-  path,
-  content,
-  message,
-  sha,
-}: UpsertDocumentParams) => {
-  const { owner, repo, branch } = entry;
-  const headers = createHeaders(token);
-  headers["Content-Type"] = "application/json";
-
-  const url = `${GITHUB_API}/repos/${owner}/${repo}/contents/${path}`;
-  console.info("[github] Writing repository document", {
-    owner,
-    repo,
-    path,
-    branch: branch ?? "default",
-    hasSha: Boolean(sha),
-    url,
-  });
-
-  const requestBody: Record<string, unknown> = {
-    message: message ?? `docs: update ${path}`,
-    content: Buffer.from(content, "utf-8").toString("base64"),
-  };
-
-  if (branch) {
-    requestBody.branch = branch;
-  }
-
-  if (sha) {
-    requestBody.sha = sha;
-  }
-
-  const response = await fetch(url, {
-    method: "PUT",
-    headers,
-    body: JSON.stringify(requestBody),
-  });
-
-  if (!response.ok) {
-    let detail = `${response.status} ${response.statusText}`;
-    const bodyText = await response.text().catch(() => "<no body>");
-    if (response.status === 404 || response.status === 403) {
-      detail +=
-        ". Confirm that the repository exists, the branch name is correct, and the provided GitHub token includes the 'repo' scope (contents:write).";
-    }
-    const logPayload = {
-      owner,
-      repo,
-      path,
-      branch: branch ?? "default",
-      hasSha: Boolean(sha),
-      status: response.status,
-      statusText: response.statusText,
-      url,
-      request: {
-        message: requestBody.message,
-        branch: branch ?? "default",
-        hasSha: Boolean(sha),
-        contentBytes: Buffer.byteLength(content, "utf-8"),
-      },
-      responseBody: bodyText,
-    };
-    console.error("[github] Failed to write repository document", {
-      ...logPayload,
-    });
-    throw new GitHubError(
-      `Failed to write ${path}: ${detail} (url: ${url})`,
-      response.status,
-    );
-  }
-
-  return response.json();
 };

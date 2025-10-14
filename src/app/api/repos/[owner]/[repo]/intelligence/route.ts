@@ -3,6 +3,7 @@ import { projectConfig } from "@/config/projects";
 import { fetchRepositoryBundle } from "@/lib/github";
 import { generateRepoAnalysis } from "@/lib/ai";
 import { getGitHubToken } from "@/lib/env";
+import db from "@/lib/db";
 
 export async function POST(
   request: NextRequest,
@@ -30,8 +31,10 @@ export async function POST(
 
   try {
     const bundle = await fetchRepositoryBundle(entry, token);
-  await generateRepoAnalysis(bundle);
-    return new Response(JSON.stringify({ ok: true }), {
+    const analysis = await generateRepoAnalysis(bundle);
+    const record = await db.upsertRepoData(owner, repo, { bundle, analysis });
+    
+    return new Response(JSON.stringify({ ok: true, data: record }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });

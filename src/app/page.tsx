@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import { formatDistanceToNow } from "date-fns";
 import { projectConfig, type ProjectConfigEntry } from "@/config/projects";
 import db from "@/lib/db";
 import type { RepositoryBundle } from "@/lib/github";
@@ -160,9 +159,6 @@ async function DashboardContent({ viewMode, sortMode, dataFilter }: DashboardCon
 
   const topLanguages = Array.from(aggregateStats.languages).slice(0, 3);
   const extraLanguageCount = aggregateStats.languages.size - topLanguages.length;
-  const lastPushText = aggregateStats.latestPush
-    ? formatDistanceToNow(aggregateStats.latestPush, { addSuffix: true })
-    : null;
   const cachedCount = aggregateStats.cachedCount;
   const totalProjects = projects.length;
   const showingAllProjects = dataFilter === "all";
@@ -198,19 +194,12 @@ async function DashboardContent({ viewMode, sortMode, dataFilter }: DashboardCon
         {cachedCount > 0 && <span>📦 {cachedCount} cached</span>}
         {cachedCount > 0 && (
           <>
-            <span>⭐ {aggregateStats.stars.toLocaleString()} stars</span>
-            <span>🍴 {aggregateStats.forks.toLocaleString()} forks</span>
-            <span>🐞 {aggregateStats.issues.toLocaleString()} open issues</span>
-            {aggregateStats.watchers > 0 && (
-              <span>👀 {aggregateStats.watchers.toLocaleString()} watchers</span>
-            )}
             {topLanguages.length > 0 && (
               <span>
                 💻 Top languages: {topLanguages.join(", ")}
                 {extraLanguageCount > 0 ? ` +${extraLanguageCount}` : ""}
               </span>
             )}
-            {lastPushText && <span>⏱ Last push {lastPushText}</span>}
           </>
         )}
       </section>
@@ -268,7 +257,7 @@ export default async function Home({ searchParams }: HomeProps) {
           </p>
           {!process.env.GITHUB_TOKEN && (
             <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
-              Set `GITHUB_TOKEN` to increase rate limits, access private repositories, and persist PROJECT_INTELLIGENCE.md updates.
+              Set `GITHUB_TOKEN` to increase rate limits and access private repositories.
             </p>
           )}
         </div>

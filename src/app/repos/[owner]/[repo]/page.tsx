@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { ArrowLeft, ExternalLink, Lightbulb } from "lucide-react";
+import { ArrowLeft, ExternalLink, Lightbulb, Clock } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 import { projectConfig } from "@/config/projects";
 import { fetchRepositoryBundle } from "@/lib/github";
 import {
@@ -11,6 +12,8 @@ import {
 import { getGitHubToken } from "@/lib/env";
 import { RepoStatusBadge } from "@/components/repo-status-badge";
 import { RepoActionsList } from "@/components/repo-actions-list";
+import { RepoIntelligenceRefreshButton } from "@/components/repo-intelligence-refresh-button";
+import db from "@/lib/db";
 
 export const revalidate = 60;
 
@@ -23,8 +26,6 @@ type RepoPageProps = {
     repo: string;
   }>;
 };
-
-const formatNumber = (value: number) => value.toLocaleString();
 
 const MarkdownPanel = ({
   path,
@@ -55,15 +56,49 @@ export default async function RepoPage({ params }: RepoPageProps) {
   }
 
   const token = getGitHubToken();
-  const bundle = await fetchRepositoryBundle(entry, token ?? undefined);
-
-  const analysis =
-    buildFallback(
+  
+  // Try to fetch from DB first
+  let record = await db.getRepoData(resolvedParams.owner, resolvedParams.repo);
+  
+  // If no cached data, fetch from GitHub as fallback
+  if (!record && token) {
+    const bundle = await fetchRepositoryBundle(entry, token);
+    const analysis = buildFallback(
       bundle,
-      token
-        ? "AI analysis is being generated. Refresh shortly to view new insights."
-        : "Provide GITHUB_TOKEN and AI credentials to enable project intelligence generation.",
+      "Data fetched from GitHub. Generating AI analysis - refresh to see insights.",
     );
+    record = await db.upsertRepoData(resolvedParams.owner, resolvedParams.repo, { bundle, analysis });
+  }
+  
+  // If still no data, show error state
+  if (!record) {
+    return (
+      <div className="mx-auto flex min-h-screen max-w-5xl flex-col gap-8 px-5 py-12">
+        <header>
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-sm text-slate-500 transition hover:text-slate-700 dark:text-slate-300 dark:hover:text-slate-100"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back to dashboard
+          </Link>
+        </header>
+        <div className="rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-800 dark:bg-red-900/20">
+          <h2 className="text-lg font-semibold text-red-800 dark:text-red-200">No Data Available</h2>
+          <p className="mt-2 text-sm text-red-700 dark:text-red-300">
+            No cached data found. Please set GITHUB_TOKEN and refresh the page to fetch data from GitHub.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const { bundle, analysis: cachedAnalysis, updatedAt } = record;
+  const analysis = cachedAnalysis ?? buildFallback(
+    bundle,
+    token
+      ? "AI analysis is being generated. Refresh shortly to view new insights."
+      : "Provide GITHUB_TOKEN and AI credentials to enable project intelligence generation.",
+  );
   const { meta, documents } = bundle;
 
   return (
@@ -86,20 +121,25 @@ export default async function RepoPage({ params }: RepoPageProps) {
             {meta.description ?? "No description available."}
           </p>
           <div className="flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-300">
-            <span>⭐ {formatNumber(meta.stars)} stars</span>
-            <span>🍴 {formatNumber(meta.forks)} forks</span>
-            <span>👀 {formatNumber(meta.watchers)} watchers</span>
-            <span>🐞 {formatNumber(meta.openIssues)} open issues</span>
             <span>Branch: {meta.defaultBranch}</span>
+            {updatedAt && (
+              <span className="inline-flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                Cached {formatDistanceToNow(new Date(updatedAt), { addSuffix: true })}
+              </span>
+            )}
           </div>
         </div>
-        <Link
-          href={meta.htmlUrl}
-          className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-        >
-          View on GitHub
-          <ExternalLink className="h-4 w-4" />
-        </Link>
+        <div className="flex gap-2">
+          <RepoIntelligenceRefreshButton owner={meta.owner} repo={meta.name} />
+          <Link
+            href={meta.htmlUrl}
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            View on GitHub
+            <ExternalLink className="h-4 w-4" />
+          </Link>
+        </div>
       </header>
 
       <section className="grid gap-6 lg:grid-cols-[2fr_1fr]">

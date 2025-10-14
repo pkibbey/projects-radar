@@ -4,7 +4,6 @@ import {
   RepositoryBundle,
 } from "@/lib/github";
 import { getAIModel, getLmStudioUrl } from "@/lib/env";
-import db from "@/lib/db";
 
 export type RepoInsight = {
   title: string;
@@ -163,12 +162,6 @@ export const generateRepoAnalysis = async (
       insights: parsed.insights ?? FALLBACK_ANALYSIS.insights,
       actions: parsed.actions ?? FALLBACK_ANALYSIS.actions,
     } satisfies RepoAnalysis;
-
-    try {
-      await db.upsertRepoData(bundle.meta.owner, bundle.meta.name, { bundle, analysis });
-    } catch (error) {
-      console.error("persistAnalysis error", error);
-    }
 
     return analysis;
   } catch (error) {

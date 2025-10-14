@@ -3,6 +3,7 @@ export type ProjectConfigEntry = {
   repo: string;
   branch?: string;
   displayName?: string;
+  fetchDocuments?: boolean; // Optional: whether to fetch markdown files from the repo
 };
 
 export const projectConfig: ProjectConfigEntry[] = [
@@ -193,8 +194,9 @@ export const projectConfig: ProjectConfigEntry[] = [
   },
 ];
 
+// Configuration for which markdown/documentation files to fetch from repositories
+// Set to empty array if you only want repo metadata without fetching files
 export const DEFAULT_FILES = [
-  "PROJECT_INTELLIGENCE.md",
   "README.md",
   "PROJECT_ANALYSIS.md",
   "TODO.md",
