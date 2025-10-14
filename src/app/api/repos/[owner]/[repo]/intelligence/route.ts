@@ -30,7 +30,7 @@ export async function POST(
 
   try {
     const bundle = await fetchRepositoryBundle(entry, token);
-    await generateRepoAnalysis(bundle, { entry, token });
+  await generateRepoAnalysis(bundle);
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
       headers: { "Content-Type": "application/json" },

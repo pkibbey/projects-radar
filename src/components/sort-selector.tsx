@@ -1,7 +1,13 @@
 "use client";
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export type SortKey = "name" | "stars" | "updated" | "completeness";
 
@@ -12,6 +18,10 @@ export const SortSelector = ({ value }: { value: SortKey }) => {
 
   const handleChange = (next: string) => {
     const key = next as SortKey;
+
+    if (key === value) {
+      return;
+    }
     const params = new URLSearchParams();
     if (searchParams) {
       for (const k of searchParams.keys()) {
@@ -41,18 +51,18 @@ export const SortSelector = ({ value }: { value: SortKey }) => {
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-300">
         Sort
       </p>
-      <ToggleGroup
-        type="single"
-        value={value}
-        onValueChange={handleChange}
-        aria-label="Select sort"
-      >
-        {options.map((opt) => (
-          <ToggleGroupItem key={opt.value} value={opt.value} aria-label={String(opt.label)}>
-            {opt.label}
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
+      <Select value={value} onValueChange={handleChange} aria-label="Select sort">
+        <SelectTrigger className="w-full sm:w-fit">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value}>
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 };

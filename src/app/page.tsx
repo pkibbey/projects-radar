@@ -1,25 +1,26 @@
 import { Suspense } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { AlertTriangle } from "lucide-react";
-import { projectConfig } from "@/config/projects";
-import { fetchRepositoryBundle, GitHubError } from "@/lib/github";
-import {
-  buildFallback,
-  generateRepoAnalysis,
-  loadCachedRepoAnalysis,
-} from "@/lib/ai";
-import { getGitHubToken } from "@/lib/env";
+import { projectConfig, type ProjectConfigEntry } from "@/config/projects";
+import db from "@/lib/db";
+import type { RepositoryBundle } from "@/lib/github";
+import type { RepoAnalysis } from "@/lib/ai";
 import { RepoCard } from "@/components/repo-card";
 import { ViewModeSwitcher } from "@/components/view-mode-switcher";
 import { SortSelector, type SortKey } from "@/components/sort-selector";
+import { DataFilterSelector } from "@/components/data-filter-selector";
 import { cn } from "@/lib/utils";
 import {
   DEFAULT_VIEW_MODE,
   isViewMode,
   type ViewMode,
 } from "@/lib/view-modes";
+import {
+  DEFAULT_DATA_FILTER,
+  isDataFilter,
+  type DataFilter,
+} from "@/lib/data-filters";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 const gridLayoutByMode: Record<ViewMode, string> = {
   list: "grid-cols-1",
@@ -33,85 +34,93 @@ const gridGapByMode: Record<ViewMode, string> = {
   expanded: "gap-8",
 };
 
-type DashboardContentProps = {
-  viewMode: ViewMode;
-  sortMode?: "name" | "stars" | "updated" | "completeness";
+type ProjectRow = {
+  entry: ProjectConfigEntry;
+  bundle: RepositoryBundle;
+  analysis: RepoAnalysis | null;
+  hasData: boolean;
+  updatedAt?: string | null;
 };
 
-async function DashboardContent({ viewMode, sortMode }: DashboardContentProps) {
-  const token = getGitHubToken();
-  const generationTasks: Promise<void>[] = [];
+const buildPlaceholderBundle = (entry: ProjectConfigEntry): RepositoryBundle => ({
+  meta: {
+    owner: entry.owner,
+    name: entry.repo,
+    displayName: entry.displayName ?? entry.repo,
+    description: null,
+    stars: 0,
+    forks: 0,
+    openIssues: 0,
+    defaultBranch: entry.branch ?? "main",
+    branch: entry.branch ?? "main",
+    pushedAt: new Date(0).toISOString(),
+    htmlUrl: `https://github.com/${entry.owner}/${entry.repo}`,
+    primaryLanguage: null,
+    status: "stale",
+    topics: [],
+    hasDiscussions: false,
+    watchers: 0,
+    license: null,
+  },
+  documents: [],
+});
 
-  const loadResults = await Promise.all(
-    projectConfig.map(async (entry) => {
-      try {
-        const bundle = await fetchRepositoryBundle(entry, token ?? undefined);
-        const cachedAnalysis = loadCachedRepoAnalysis(bundle);
+const keyForEntry = (entry: ProjectConfigEntry) => `${entry.owner.toLowerCase()}/${entry.repo.toLowerCase()}`;
 
-        if (!cachedAnalysis && token) {
-          const task = generateRepoAnalysis(bundle, {
-            entry,
-            token,
-          })
-            .then(() => {
-              console.info(
-                `[ai] Generated project intelligence for ${entry.owner}/${entry.repo}.`,
-              );
-            })
-            .catch((error) => {
-              console.error(
-                `[ai] Failed to generate project intelligence for ${entry.owner}/${entry.repo}.`,
-                error,
-              );
-            });
-          generationTasks.push(task);
-        }
+type DashboardContentProps = {
+  viewMode: ViewMode;
+  sortMode: SortKey;
+  dataFilter: DataFilter;
+};
 
-        const analysis =
-          cachedAnalysis ??
-          buildFallback(
-            bundle,
-            token
-              ? "AI analysis is being generated. Refresh shortly to view new insights."
-              : "Provide GITHUB_TOKEN and AI credentials to enable project intelligence generation.",
-          );
+async function DashboardContent({ viewMode, sortMode, dataFilter }: DashboardContentProps) {
+  const records = await db.listRepoData();
+  const recordMap = new Map(records.map((record) => [record.key, record]));
 
-        return { bundle, analysis };
-      } catch (error) {
-        if (error instanceof GitHubError) {
-          return { error: `${entry.owner}/${entry.repo}: ${error.message}` };
-        }
-        return {
-          error: `${entry.owner}/${entry.repo}: ${(error as Error).message}`,
-        };
-      }
-    }),
-  );
+  const projects: ProjectRow[] = projectConfig.map((entry) => {
+    const record = recordMap.get(keyForEntry(entry)) ?? null;
+    const bundle = record?.bundle ?? buildPlaceholderBundle(entry);
+    return {
+      entry,
+      bundle,
+      analysis: record?.analysis ?? null,
+      hasData: Boolean(record),
+      updatedAt: record?.updatedAt ?? null,
+    } satisfies ProjectRow;
+  });
 
-  const errors = loadResults.filter((result) => "error" in result) as Array<{
-    error: string;
-  }>;
+  if (!projects.length) {
+    return (
+      <div className="mx-auto max-w-2xl text-center text-sm text-slate-600 dark:text-slate-300">
+        <p className="font-medium">
+          No repositories configured. Populate `projectConfig` to get started.
+        </p>
+      </div>
+    );
+  }
 
-  const projects = loadResults.filter(
-    (result): result is { bundle: Awaited<ReturnType<typeof fetchRepositoryBundle>>; analysis: Awaited<ReturnType<typeof generateRepoAnalysis>> } =>
-      "bundle" in result,
-  );
+  const filteredProjects = projects.filter((project) => {
+    if (dataFilter === "with-data") {
+      return project.hasData;
+    }
+    if (dataFilter === "without-data") {
+      return !project.hasData;
+    }
+    return true;
+  });
 
-  const sortedProjects = projects.slice().sort((a, b) => {
+  const sortedProjects = filteredProjects.slice().sort((a, b) => {
     if (sortMode === "stars") {
       return b.bundle.meta.stars - a.bundle.meta.stars;
     }
     if (sortMode === "updated") {
-      return (
-        new Date(b.bundle.meta.pushedAt).getTime() - new Date(a.bundle.meta.pushedAt).getTime()
-      );
+      return new Date(b.bundle.meta.pushedAt).getTime() - new Date(a.bundle.meta.pushedAt).getTime();
     }
     if (sortMode === "completeness") {
       const as = a.bundle.meta.completenessScore ?? 0;
       const bs = b.bundle.meta.completenessScore ?? 0;
       return bs - as;
     }
-    // default name sort
     return a.bundle.meta.displayName.localeCompare(b.bundle.meta.displayName);
   });
 
@@ -120,9 +129,13 @@ async function DashboardContent({ viewMode, sortMode }: DashboardContentProps) {
     label: bundle.meta.displayName,
   }));
 
-  const aggregateStats = projects.reduce(
-    (acc, { bundle }) => {
-      const { stars, forks, openIssues, watchers, pushedAt, primaryLanguage } = bundle.meta;
+  const aggregateStats = filteredProjects.reduce(
+    (acc, project) => {
+      if (!project.hasData) {
+        return acc;
+      }
+
+      const { stars, forks, openIssues, watchers, pushedAt, primaryLanguage } = project.bundle.meta;
       acc.stars += stars;
       acc.forks += forks;
       acc.issues += openIssues;
@@ -131,6 +144,7 @@ async function DashboardContent({ viewMode, sortMode }: DashboardContentProps) {
       if (primaryLanguage) {
         acc.languages.add(primaryLanguage);
       }
+      acc.cachedCount += 1;
       return acc;
     },
     {
@@ -140,6 +154,7 @@ async function DashboardContent({ viewMode, sortMode }: DashboardContentProps) {
       watchers: 0,
       latestPush: 0,
       languages: new Set<string>(),
+      cachedCount: 0,
     },
   );
 
@@ -148,42 +163,12 @@ async function DashboardContent({ viewMode, sortMode }: DashboardContentProps) {
   const lastPushText = aggregateStats.latestPush
     ? formatDistanceToNow(aggregateStats.latestPush, { addSuffix: true })
     : null;
-
-  if (generationTasks.length > 0) {
-    void Promise.allSettled(generationTasks);
-  }
-
-  if (!projects.length) {
-    return (
-      <div className="mx-auto max-w-2xl text-center text-sm text-slate-600 dark:text-slate-300">
-        <p className="font-medium">
-          No repositories could be loaded. Configure `projectConfig` with at least one repository.
-        </p>
-        {errors.map((item) => (
-          <p key={item.error} className="mt-2 text-xs text-rose-500 dark:text-rose-400">
-            {item.error}
-          </p>
-        ))}
-      </div>
-    );
-  }
+  const cachedCount = aggregateStats.cachedCount;
+  const totalProjects = projects.length;
+  const showingAllProjects = dataFilter === "all";
 
   return (
     <div className="flex flex-col gap-6">
-      {errors.length > 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
-          <p className="flex items-center gap-2 font-medium">
-            <AlertTriangle className="h-4 w-4" />
-            Some repositories failed to load
-          </p>
-          <ul className="mt-2 list-disc space-y-1 pl-6">
-            {errors.map((item) => (
-              <li key={item.error}>{item.error}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
       {navItems.length > 0 && (
         <nav
           aria-label="Repository shortcuts"
@@ -206,34 +191,49 @@ async function DashboardContent({ viewMode, sortMode }: DashboardContentProps) {
 
       <section className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
         <span className="font-medium text-slate-600 dark:text-slate-200">
-          {projects.length} repositories tracked
+          {showingAllProjects
+            ? `${totalProjects} repositories configured`
+            : `Showing ${filteredProjects.length} of ${totalProjects} repositories`}
         </span>
-        <span>⭐ {aggregateStats.stars.toLocaleString()} stars</span>
-        <span>🍴 {aggregateStats.forks.toLocaleString()} forks</span>
-        <span>🐞 {aggregateStats.issues.toLocaleString()} open issues</span>
-        {aggregateStats.watchers > 0 && (
-          <span>👀 {aggregateStats.watchers.toLocaleString()} watchers</span>
+        {cachedCount > 0 && <span>📦 {cachedCount} cached</span>}
+        {cachedCount > 0 && (
+          <>
+            <span>⭐ {aggregateStats.stars.toLocaleString()} stars</span>
+            <span>🍴 {aggregateStats.forks.toLocaleString()} forks</span>
+            <span>🐞 {aggregateStats.issues.toLocaleString()} open issues</span>
+            {aggregateStats.watchers > 0 && (
+              <span>👀 {aggregateStats.watchers.toLocaleString()} watchers</span>
+            )}
+            {topLanguages.length > 0 && (
+              <span>
+                💻 Top languages: {topLanguages.join(", ")}
+                {extraLanguageCount > 0 ? ` +${extraLanguageCount}` : ""}
+              </span>
+            )}
+            {lastPushText && <span>⏱ Last push {lastPushText}</span>}
+          </>
         )}
-        {topLanguages.length > 0 && (
-          <span>
-            💻 Top languages: {topLanguages.join(", ")}
-            {extraLanguageCount > 0 ? ` +${extraLanguageCount}` : ""}
-          </span>
-        )}
-        {lastPushText && <span>⏱ Last push {lastPushText}</span>}
       </section>
 
-      <div className={cn("grid", gridGapByMode[viewMode], gridLayoutByMode[viewMode])}>
-        {sortedProjects.map(({ bundle, analysis }) => (
-          <RepoCard
-            key={`${bundle.meta.owner}/${bundle.meta.name}`}
-            bundle={bundle}
-            analysis={analysis}
-            mode={viewMode}
-            id={`${bundle.meta.owner}-${bundle.meta.name}`}
-          />
-        ))}
-      </div>
+      {sortedProjects.length === 0 ? (
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          No repositories match this filter.
+        </p>
+      ) : (
+        <div className={cn("grid", gridGapByMode[viewMode], gridLayoutByMode[viewMode])}>
+          {sortedProjects.map((project) => (
+            <RepoCard
+              key={`${project.bundle.meta.owner}/${project.bundle.meta.name}`}
+              bundle={project.bundle}
+              analysis={project.analysis}
+              hasData={project.hasData}
+              lastGeneratedAt={project.updatedAt ?? undefined}
+              mode={viewMode}
+              id={`${project.bundle.meta.owner}-${project.bundle.meta.name}`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -248,8 +248,12 @@ export default async function Home({ searchParams }: HomeProps) {
     ? resolvedParams.view[0]
     : resolvedParams.view;
   const rawSort = Array.isArray(resolvedParams.sort) ? resolvedParams.sort[0] : resolvedParams.sort;
-  const sortMode = rawSort === "stars" || rawSort === "updated" || rawSort === "completeness" ? rawSort : "name";
+  const rawDataFilter = Array.isArray(resolvedParams.data)
+    ? resolvedParams.data[0]
+    : resolvedParams.data;
+  const sortMode: SortKey = rawSort === "stars" || rawSort === "updated" || rawSort === "completeness" ? rawSort : "name";
   const viewMode = isViewMode(rawView) ? rawView : DEFAULT_VIEW_MODE;
+  const dataFilter = isDataFilter(rawDataFilter) ? rawDataFilter : DEFAULT_DATA_FILTER;
 
   return (
     <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-10 px-6 py-12">
@@ -268,14 +272,15 @@ export default async function Home({ searchParams }: HomeProps) {
             </p>
           )}
         </div>
-        <div className="flex items-center gap-4">
-          <SortSelector value={sortMode as SortKey} />
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-6">
+          <DataFilterSelector value={dataFilter} />
+          <SortSelector value={sortMode} />
           <ViewModeSwitcher value={viewMode} />
         </div>
       </header>
 
       <Suspense fallback={<p className="text-sm text-slate-500">Loading repositories…</p>}>
-        <DashboardContent viewMode={viewMode} sortMode={sortMode as SortKey} />
+        <DashboardContent viewMode={viewMode} sortMode={sortMode} dataFilter={dataFilter} />
       </Suspense>
     </div>
   );

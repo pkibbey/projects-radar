@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Loader2, RefreshCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -8,9 +9,22 @@ export type RepoIntelligenceRefreshButtonProps = {
   owner: string;
   repo: string;
   size?: "sm" | "md";
+  useDataEndpoint?: boolean; // if true, call /data instead of /intelligence
+  idleLabel?: string;
+  loadingLabel?: string;
+  successMessage?: string;
 };
 
-export const RepoIntelligenceRefreshButton = ({ owner, repo, size = "md" }: RepoIntelligenceRefreshButtonProps) => {
+export const RepoIntelligenceRefreshButton = ({
+  owner,
+  repo,
+  size = "md",
+  useDataEndpoint = true,
+  idleLabel = "Regenerate AI",
+  loadingLabel = "Processing…",
+  successMessage = "Latest data loaded.",
+}: RepoIntelligenceRefreshButtonProps) => {
+  const router = useRouter();
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
 
@@ -23,9 +37,8 @@ export const RepoIntelligenceRefreshButton = ({ owner, repo, size = "md" }: Repo
     setMessage(null);
 
     try {
-      const response = await fetch(`/api/repos/${owner}/${repo}/intelligence`, {
-        method: "POST",
-      });
+      const endpoint = useDataEndpoint ? `/api/repos/${owner}/${repo}/data` : `/api/repos/${owner}/${repo}/intelligence`;
+      const response = await fetch(endpoint, { method: "POST" });
 
       if (!response.ok) {
         const payload = (await response.json().catch(() => ({}))) as { error?: string };
@@ -33,7 +46,8 @@ export const RepoIntelligenceRefreshButton = ({ owner, repo, size = "md" }: Repo
       }
 
       setStatus("success");
-      setMessage("Regeneration queued. Refresh shortly to see updated insights.");
+      setMessage(successMessage);
+      router.refresh();
     } catch (error) {
       setStatus("error");
       setMessage(
@@ -44,7 +58,7 @@ export const RepoIntelligenceRefreshButton = ({ owner, repo, size = "md" }: Repo
         setStatus("idle");
       }, 4000);
     }
-  }, [owner, repo, status]);
+  }, [owner, repo, status, successMessage, useDataEndpoint, router]);
 
   return (
     <div className="flex flex-col items-end gap-1 text-right">
@@ -62,8 +76,8 @@ export const RepoIntelligenceRefreshButton = ({ owner, repo, size = "md" }: Repo
           <Loader2 className="h-4 w-4 animate-spin" />
         ) : (
           <RefreshCcw className="h-4 w-4" />
-        )}
-        {status === "loading" ? "Processing…" : "Regenerate AI"}
+    )}
+    {status === "loading" ? loadingLabel : idleLabel}
       </button>
       {message && (
         <p className="max-w-xs text-xs text-slate-500 dark:text-slate-400">

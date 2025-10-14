@@ -11,7 +11,7 @@ Project Radar is a Next.js dashboard that aggregates GitHub repositories, highli
 - Node.js 18.18 or later
 - npm 9 or later (ships with Node)
 - A GitHub personal access token (optional but recommended)
-- Either a local LM Studio instance (default) or an OpenAI API key for hosted inference
+- A local LM Studio instance exposing an OpenAI-compatible server
 
 ## Quick start
 
@@ -28,11 +28,8 @@ Project Radar is a Next.js dashboard that aggregates GitHub repositories, highli
 	```
 
 	- `GITHUB_TOKEN` (recommended): enables higher rate limits, access to private repositories, and permission to sync `PROJECT_INTELLIGENCE.md` back to each repo (`repo` scope required). Without it, the dashboard shows fallback guidance instead of generating fresh intelligence.
-	- `AI_PROVIDER`: choose `lmstudio` (default) to connect to a locally running LM Studio instance, or `openai` to call OpenAI.
-	- `AI_MODEL` (optional): override the default model for the selected provider.
+	- `AI_MODEL` (optional): override the default model served by LM Studio.
 	- `LM_STUDIO_URL` (optional): override the base URL for LM Studio. Defaults to `http://localhost:1234/v1`.
-	- `OPENAI_API_KEY` (when `AI_PROVIDER=openai`): enables hosted AI summaries and actions.
-	- `OPENAI_BASE_URL` (optional): override the OpenAI-compatible base URL.
 
 3. Define the repositories you want to monitor by editing `src/config/projects.ts`.
 
@@ -49,7 +46,7 @@ Project Radar is a Next.js dashboard that aggregates GitHub repositories, highli
 - Repository list: edit `projectConfig` inside `src/config/projects.ts`. Each entry accepts `owner`, `repo`, optional `branch`, and optional `displayName`.
 - Documentation files: by default the dashboard looks for `README.md`, `PROJECT_ANALYSIS.md`, `TODO.md`, and `PROJECT.md` in the repository root. Update `DEFAULT_FILES` in the same file to customize.
 - Project intelligence caching: the first time a repository is analyzed, the dashboard stores the AI output in `PROJECT_INTELLIGENCE.md`. Subsequent requests reuse that file instead of calling the model. Remove the file in GitHub if you need to regenerate it manually.
-- AI settings: set `AI_PROVIDER` to `lmstudio` or `openai`. For LM Studio, ensure the desktop app exposes an OpenAI-compatible server (default `http://localhost:1234/v1`). For OpenAI, supply `OPENAI_API_KEY` (and optionally `OPENAI_BASE_URL`).
+- AI settings: ensure LM Studio exposes an OpenAI-compatible server (default `http://localhost:1234/v1`). Override `AI_MODEL` or `LM_STUDIO_URL` as needed.
 
 ## Available scripts
 
@@ -62,4 +59,4 @@ npm run lint    # run ESLint
 
 ## Deployment notes
 
-The app is a standard Next.js App Router project. Deploy to Vercel or any Node-capable platform. Remember to configure the environment variables in your hosting provider so GitHub and OpenAI integrations continue to function.
+The app is a standard Next.js App Router project. Deploy to Vercel or any Node-capable platform. Remember to configure the environment variables in your hosting provider so GitHub integration and LM Studio connectivity continue to function.

@@ -1,7 +1,13 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   DEFAULT_VIEW_MODE,
   isViewMode,
@@ -40,18 +46,18 @@ export const ViewModeSwitcher = ({ value }: ViewModeSwitcherProps) => {
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-300">
         View mode
       </p>
-      <ToggleGroup
-        type="single"
-        value={value}
-        onValueChange={handleChange}
-        aria-label="Select view mode"
-      >
-        {VIEW_MODES.map((mode) => (
-          <ToggleGroupItem key={mode} value={mode} aria-label={VIEW_MODE_LABELS[mode]}>
-            {VIEW_MODE_LABELS[mode]}
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
+      <Select value={value} onValueChange={handleChange} aria-label="Select view mode">
+        <SelectTrigger className="w-full sm:w-fit">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {VIEW_MODES.map((mode) => (
+            <SelectItem key={mode} value={mode}>
+              {VIEW_MODE_LABELS[mode]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 };

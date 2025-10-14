@@ -7,8 +7,6 @@ import { projectConfig } from "@/config/projects";
 import { fetchRepositoryBundle } from "@/lib/github";
 import {
   buildFallback,
-  generateRepoAnalysis,
-  loadCachedRepoAnalysis,
 } from "@/lib/ai";
 import { getGitHubToken } from "@/lib/env";
 import { RepoStatusBadge } from "@/components/repo-status-badge";
@@ -58,28 +56,8 @@ export default async function RepoPage({ params }: RepoPageProps) {
 
   const token = getGitHubToken();
   const bundle = await fetchRepositoryBundle(entry, token ?? undefined);
-  const cachedAnalysis = loadCachedRepoAnalysis(bundle);
-
-  if (!cachedAnalysis && token) {
-    void generateRepoAnalysis(bundle, {
-      entry,
-      token,
-    })
-      .then(() => {
-        console.info(
-          `[ai] Generated project intelligence for ${entry.owner}/${entry.repo}.`,
-        );
-      })
-      .catch((error) => {
-        console.error(
-          `[ai] Failed to generate project intelligence for ${entry.owner}/${entry.repo}.`,
-          error,
-        );
-      });
-  }
 
   const analysis =
-    cachedAnalysis ??
     buildFallback(
       bundle,
       token

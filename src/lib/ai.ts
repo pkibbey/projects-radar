@@ -1,17 +1,10 @@
 import OpenAI from "openai";
-import { ProjectConfigEntry } from "@/config/projects";
 import {
   GitHubError,
   RepositoryBundle,
-  upsertRepositoryDocument,
 } from "@/lib/github";
-import {
-  getAIModel,
-  getAIProvider,
-  getLmStudioUrl,
-  getOpenAIBaseUrl,
-  getOpenAIKey,
-} from "@/lib/env";
+import { getAIModel, getLmStudioUrl } from "@/lib/env";
+import db from "@/lib/db";
 
 export type RepoInsight = {
   title: string;
@@ -29,7 +22,6 @@ export type RepoAnalysis = {
   actions: RepoAction[];
 };
 
-const INTELLIGENCE_FILENAME = "PROJECT_INTELLIGENCE.md";
 const LM_STUDIO_FAILURE_MESSAGE =
   "The dashboard could not connect to the local LM Studio server. Start LM Studio on http://localhost:1234 or update AI configuration.";
 
@@ -43,18 +35,19 @@ let loggedProviderFailure = false;
 
 const FALLBACK_ANALYSIS: RepoAnalysis = {
   summary:
-    "AI insights are unavailable. Configure AI provider settings or ensure the default LM Studio instance is running locally.",
+    "AI insights are unavailable. Start LM Studio locally or point LM_STUDIO_URL at the server you expect to use.",
   insights: [
     {
       title: "Missing AI configuration",
       description:
-        "Set AI_PROVIDER=lmstudio and run LM Studio on http://localhost:1234 or provide an OPENAI_API_KEY for OpenAI access.",
+        "Start LM Studio on http://localhost:1234 or point LM_STUDIO_URL at a running instance.",
     },
   ],
   actions: [
     {
       title: "Configure AI access",
-      instruction: "Set AI_PROVIDER along with OPENAI_API_KEY or LM_STUDIO_URL to unlock automated insights.",
+      instruction:
+        "Start LM Studio locally or update LM_STUDIO_URL so the dashboard can reach your model server.",
     },
   ],
 };
@@ -103,75 +96,6 @@ export const buildFallback = (bundle: RepositoryBundle, summary?: string): RepoA
     summary ?? bundle.documents[0]?.content.slice(0, 280) ?? FALLBACK_ANALYSIS.summary,
 });
 
-const parseIntelligenceDocument = (content: string): RepoAnalysis | null => {
-  try {
-    const payload = extractJson(content);
-    if (!payload.trim().startsWith("{") && !payload.trim().startsWith("[")) {
-      return null;
-    }
-    const parsed = JSON.parse(payload) as Partial<RepoAnalysis>;
-
-    if (!parsed.summary || !Array.isArray(parsed.insights) || !Array.isArray(parsed.actions)) {
-      return null;
-    }
-
-    return {
-      summary: parsed.summary,
-      insights: parsed.insights,
-      actions: parsed.actions,
-    };
-  } catch (error) {
-    console.error("parseIntelligenceDocument error", error);
-    return null;
-  }
-};
-
-export const loadCachedRepoAnalysis = (bundle: RepositoryBundle): RepoAnalysis | null => {
-  const intelligenceDocument = bundle.documents.find(
-    (doc) => doc.path === INTELLIGENCE_FILENAME,
-  );
-
-  if (!intelligenceDocument) {
-    return null;
-  }
-
-  const parsed = parseIntelligenceDocument(intelligenceDocument.content);
-  if (parsed) {
-    return parsed;
-  }
-
-  console.warn(
-    `Unable to parse ${INTELLIGENCE_FILENAME} for ${bundle.meta.owner}/${bundle.meta.name}. Skipping regeneration to preserve existing document.`,
-  );
-  return buildFallback(
-    bundle,
-    `${INTELLIGENCE_FILENAME} exists but could not be parsed. Update the file manually to refresh insights.`,
-  );
-};
-
-const buildIntelligenceMarkdown = (bundle: RepositoryBundle, analysis: RepoAnalysis) => {
-  const generatedAt = new Date().toISOString();
-  const header = `# Project Intelligence for ${bundle.meta.displayName}\n\nGenerated on ${generatedAt}.\n`;
-  const summarySection = `\n## Summary\n\n${analysis.summary}\n`;
-  const insightsSection =
-    analysis.insights.length > 0
-      ? `\n## Key Insights\n\n${analysis.insights
-          .map((insight) => `- **${insight.title}**: ${insight.description}`)
-          .join("\n")}\n`
-      : "\n## Key Insights\n\n_No insights available._\n";
-
-  const actionsSection =
-    analysis.actions.length > 0
-      ? `\n## Suggested Actions\n\n${analysis.actions
-          .map((action) => `- **${action.title}**: ${action.instruction}`)
-          .join("\n")}\n`
-      : "\n## Suggested Actions\n\n_No actions available._\n";
-
-  const jsonBlock = `\n\n\u0060\u0060\u0060json\n${JSON.stringify(analysis, null, 2)}\n\u0060\u0060\u0060\n`;
-
-  return `${header}${summarySection}${insightsSection}${actionsSection}${jsonBlock}`;
-};
-
 const isConnectionError = (error: unknown): boolean => {
   if (!error) {
     return false;
@@ -203,35 +127,15 @@ const isConnectionError = (error: unknown): boolean => {
 
 export const generateRepoAnalysis = async (
   bundle: RepositoryBundle,
-  context?: {
-    entry: ProjectConfigEntry;
-    token?: string | null;
-  },
 ): Promise<RepoAnalysis> => {
-  if (!context?.token) {
-    return buildFallback(
-      bundle,
-      "Set GITHUB_TOKEN with repo scope to generate and persist PROJECT_INTELLIGENCE.md for this repository.",
-    );
-  }
-
-  const provider = getAIProvider();
-  const model = getAIModel(provider);
-  const openAIKey = getOpenAIKey();
-
-  if (provider === "openai" && !openAIKey) {
-    return buildFallback(
-      bundle,
-      "AI provider is set to OpenAI but OPENAI_API_KEY is missing. Provide a key or switch AI_PROVIDER to lmstudio.",
-    );
-  }
+  const model = getAIModel();
 
   const client = new OpenAI({
-    apiKey: provider === "lmstudio" ? openAIKey ?? "lm-studio" : openAIKey!,
-    baseURL: provider === "lmstudio" ? getLmStudioUrl() : getOpenAIBaseUrl(),
+    apiKey: "lm-studio",
+    baseURL: getLmStudioUrl(),
   });
 
-  if (provider === "lmstudio" && providerHealth.status === "failed") {
+  if (providerHealth.status === "failed") {
     return buildFallback(bundle, providerHealth.message ?? LM_STUDIO_FAILURE_MESSAGE);
   }
 
@@ -260,23 +164,15 @@ export const generateRepoAnalysis = async (
       actions: parsed.actions ?? FALLBACK_ANALYSIS.actions,
     } satisfies RepoAnalysis;
 
-    if (context?.token) {
-      try {
-        await upsertRepositoryDocument({
-          entry: context.entry,
-          token: context.token,
-          path: INTELLIGENCE_FILENAME,
-          content: buildIntelligenceMarkdown(bundle, analysis),
-          message: `docs: update ${INTELLIGENCE_FILENAME}`,
-        });
-      } catch (error) {
-        console.error("persistIntelligence error", error);
-      }
+    try {
+      await db.upsertRepoData(bundle.meta.owner, bundle.meta.name, { bundle, analysis });
+    } catch (error) {
+      console.error("persistAnalysis error", error);
     }
 
     return analysis;
   } catch (error) {
-    if (provider === "lmstudio" && isConnectionError(error)) {
+    if (isConnectionError(error)) {
       providerHealth = {
         status: "failed",
         message: LM_STUDIO_FAILURE_MESSAGE,

@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { ExternalLink, Lightbulb, ListChecks } from "lucide-react";
-import { RepositoryBundle } from "@/lib/github";
-import { RepoAnalysis } from "@/lib/ai";
+import type { RepositoryBundle } from "@/lib/github";
+import type { RepoAnalysis } from "@/lib/ai";
 import { cn } from "@/lib/utils";
-import { ViewMode } from "@/lib/view-modes";
+import type { ViewMode } from "@/lib/view-modes";
 import { RepoStatusBadge } from "@/components/repo-status-badge";
 import { RepoActionsList } from "@/components/repo-actions-list";
 import { RepoIntelligenceRefreshButton } from "@/components/repo-intelligence-refresh-button";
@@ -14,48 +14,63 @@ import { CompletenessIndicator } from "@/components/completeness-indicator";
 
 export type RepoCardProps = {
   bundle: RepositoryBundle;
-  analysis: RepoAnalysis;
+  analysis: RepoAnalysis | null;
+  hasData: boolean;
+  lastGeneratedAt?: string;
   mode: ViewMode;
   id?: string;
 };
 
-export const RepoCard = ({ bundle, analysis, mode, id }: RepoCardProps) => {
+export const RepoCard = ({
+  bundle,
+  analysis,
+  hasData,
+  lastGeneratedAt,
+  mode,
+  id,
+}: RepoCardProps) => {
   const { meta } = bundle;
-  const lastUpdatedText = formatDistanceToNow(new Date(meta.pushedAt), {
-    addSuffix: true,
-  });
+
+  const lastUpdatedText = hasData
+    ? formatDistanceToNow(new Date(meta.pushedAt), { addSuffix: true })
+    : null;
+  const cachedAtText = lastGeneratedAt
+    ? formatDistanceToNow(new Date(lastGeneratedAt), { addSuffix: true })
+    : null;
 
   const isList = mode === "list";
   const isCompact = mode === "compact";
   const isExpanded = mode === "expanded";
 
-  const showMetrics = !isList;
-  const showInsights = !isList && !isCompact;
-  const showActions = isExpanded;
+  const showMetrics = hasData && !isList;
+  const showInsights = hasData && !isList && !isCompact;
+  const showActions = hasData && isExpanded;
   const insightLimit = isExpanded ? undefined : 3;
   const insights = showInsights
-    ? insightLimit
-      ? analysis.insights.slice(0, insightLimit)
-      : analysis.insights
+    ? (analysis?.insights ?? []).slice(0, insightLimit)
     : [];
-  const showTopics = isExpanded && meta.topics.length > 0;
+  const showTopics = hasData && isExpanded && meta.topics.length > 0;
 
   const cardSpacing = isList ? "gap-4 p-4" : isCompact ? "gap-5 p-5" : "gap-6 p-6";
   const detailButtonSize = isList || isCompact ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm";
   const refreshButtonSize = isList || isCompact ? "sm" : "md";
   const descriptionTone = isList ? "text-xs" : "text-sm";
 
-  const metrics: string[] = [
-    `⭐ ${meta.stars.toLocaleString()} stars`,
-    `🍴 ${meta.forks.toLocaleString()} forks`,
-    `🐞 ${meta.openIssues.toLocaleString()} open issues`,
-  ];
-  if (!isCompact) {
-    metrics.splice(2, 0, `👀 ${meta.watchers.toLocaleString()} watchers`);
-  }
-  if (meta.primaryLanguage) {
-    metrics.push(`💻 ${meta.primaryLanguage}`);
-  }
+  const metrics = showMetrics
+    ? (() => {
+        const base = [];
+        if (meta.primaryLanguage) {
+          base.push(`💻 ${meta.primaryLanguage}`);
+        }
+        return base;
+      })()
+    : [];
+
+  const summaryText =
+    analysis?.summary ??
+    (hasData
+      ? "Project data is stored, but AI insights are unavailable. Regenerate to refresh intelligence or add AI credentials."
+      : "No cached data yet. Generate repository data to populate metrics and insights.");
 
   return (
     <article
@@ -63,7 +78,7 @@ export const RepoCard = ({ bundle, analysis, mode, id }: RepoCardProps) => {
       className={cn(
         "flex flex-col rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900",
         cardSpacing,
-        "scroll-mt-42"
+        "scroll-mt-42",
       )}
     >
       <header
@@ -75,14 +90,14 @@ export const RepoCard = ({ bundle, analysis, mode, id }: RepoCardProps) => {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <RepoStatusBadge status={meta.status} />
-            {typeof meta.completenessScore === 'number' && (
-              <CompletenessIndicator 
-                score={meta.completenessScore} 
+            {hasData && typeof meta.completenessScore === "number" && (
+              <CompletenessIndicator
+                score={meta.completenessScore}
                 size={isList || isCompact ? "sm" : "md"}
               />
             )}
             <span className="text-xs text-slate-500 dark:text-slate-400">
-              Updated {lastUpdatedText}
+              {lastUpdatedText ? `Repo updated ${lastUpdatedText}` : "No cached repository data"}
             </span>
           </div>
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
@@ -94,7 +109,9 @@ export const RepoCard = ({ bundle, analysis, mode, id }: RepoCardProps) => {
               descriptionTone,
             )}
           >
-            {meta.description ?? "No description provided."}
+            {hasData
+              ? meta.description ?? "No description provided."
+              : "Generate cached data to pull the latest repository description and metadata from GitHub."}
           </p>
         </div>
         <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-start">
@@ -102,6 +119,14 @@ export const RepoCard = ({ bundle, analysis, mode, id }: RepoCardProps) => {
             owner={meta.owner}
             repo={meta.name}
             size={refreshButtonSize}
+            idleLabel={hasData ? "Refresh data" : "Generate data"}
+            loadingLabel={hasData ? "Refreshing…" : "Generating…"}
+            successMessage={
+              hasData
+                ? "Latest insights loaded."
+                : "Data generated. Loading fresh metrics…"
+            }
+            useDataEndpoint={true}
           />
           <Link
             href={`/repos/${meta.owner}/${meta.name}`}
@@ -146,7 +171,7 @@ export const RepoCard = ({ bundle, analysis, mode, id }: RepoCardProps) => {
                 isList ? "mt-1 text-sm" : "mt-2 text-sm",
               )}
             >
-              {analysis.summary}
+              {summaryText}
             </p>
           </div>
 
@@ -174,7 +199,7 @@ export const RepoCard = ({ bundle, analysis, mode, id }: RepoCardProps) => {
           )}
         </div>
 
-        {showActions && <RepoActionsList actions={analysis.actions} />}
+        {showActions && <RepoActionsList actions={analysis?.actions ?? []} />}
       </section>
 
       {showTopics && (
@@ -188,6 +213,12 @@ export const RepoCard = ({ bundle, analysis, mode, id }: RepoCardProps) => {
             </span>
           ))}
         </footer>
+      )}
+
+      {cachedAtText && (
+        <p className="text-right text-xs text-slate-400 dark:text-slate-500">
+          Cached {cachedAtText}
+        </p>
       )}
     </article>
   );

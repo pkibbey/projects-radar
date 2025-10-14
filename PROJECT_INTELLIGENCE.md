@@ -12,11 +12,7 @@ The `pkibbey/projects-dashboard` repository hosts a Next.js dashboard designed t
 - **Project Health: Lack of Community Engagement**: The repository has 0 stars, forks, and watchers. This suggests limited visibility or a lack of community interest.  Consider promoting the project to increase discoverability.
 - **Configuration: Project Configuration**: The project configuration is managed in `src/config/projects.ts`.  Ensure the list of monitored repositories is up-to-date and includes relevant projects.
 - **Dependencies: TypeScript & Next.js**: The project utilizes TypeScript and Next.js, indicating a modern and potentially well-structured codebase.  Reviewing the code quality and testing practices is recommended.
-- **AI Integration: AI Provider Configuration**: The dashboard supports both LM Studio and OpenAI as AI providers.  Verify the chosen provider is properly configured and that API keys (if applicable) are securely stored.
-
-## Suggested Actions
-
-- **Monitor Repository Activity**: Implement automated monitoring of the repository's commit history and issue activity to track project health.
+- **AI Integration: LM Studio Connectivity**: The dashboard relies on a locally running LM Studio instance.  Ensure the OpenAI-compatible server is reachable at the configured URL.
 - **Promote Project Visibility**: Explore options for promoting the project (e.g., sharing on relevant platforms, contributing to community discussions) to increase its visibility and attract users.
 - **Review Code Quality**: Conduct a code review to assess the quality of the TypeScript and Next.js codebase, focusing on adherence to best practices.
 - **Security Review**: Review the project's security posture, especially regarding the handling of GitHub tokens and API keys.
@@ -43,8 +39,8 @@ The `pkibbey/projects-dashboard` repository hosts a Next.js dashboard designed t
       "description": "The project utilizes TypeScript and Next.js, indicating a modern and potentially well-structured codebase.  Reviewing the code quality and testing practices is recommended."
     },
     {
-      "title": "AI Integration: AI Provider Configuration",
-      "description": "The dashboard supports both LM Studio and OpenAI as AI providers.  Verify the chosen provider is properly configured and that API keys (if applicable) are securely stored."
+      "title": "AI Integration: LM Studio Connectivity",
+      "description": "The dashboard relies on a locally running LM Studio instance.  Ensure the OpenAI-compatible server is reachable at the configured URL."
     }
   ],
   "actions": [
