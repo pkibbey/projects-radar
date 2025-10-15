@@ -123,10 +123,13 @@ async function DashboardContent({ viewMode, sortMode, dataFilter }: DashboardCon
     return a.bundle.meta.displayName.localeCompare(b.bundle.meta.displayName);
   });
 
-  const navItems = sortedProjects.map(({ bundle }) => ({
-    id: `${bundle.meta.owner}-${bundle.meta.name}`,
-    label: bundle.meta.displayName,
-  }));
+  const staleProjects = sortedProjects
+    .filter((project) => !project.hasData)
+    .map((project) => ({
+      owner: project.bundle.meta.owner,
+      repo: project.bundle.meta.name,
+      displayName: project.bundle.meta.displayName,
+    }));
 
   const aggregateStats = filteredProjects.reduce(
     (acc, project) => {
@@ -165,26 +168,6 @@ async function DashboardContent({ viewMode, sortMode, dataFilter }: DashboardCon
 
   return (
     <div className="flex flex-col gap-6">
-      {navItems.length > 0 && (
-        <nav
-          aria-label="Repository shortcuts"
-          className="sticky top-0 z-10 overflow-x-auto rounded-xl border border-slate-200 bg-white/80 p-3 backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/80"
-        >
-          <ol className="flex flex-wrap gap-2">
-            {navItems.map((item) => (
-              <li key={item.id}>
-                <a
-                  href={`#${item.id}`}
-                  className="inline-flex items-center gap-2 rounded-sm border border-slate-200 px-1.5 py-1 text-xs font-medium text-slate-600 transition hover:border-slate-400 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-slate-100"
-                >
-                  {item.label}
-                </a>
-              </li>
-            ))}
-          </ol>
-        </nav>
-      )}
-
       <section className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
         <span className="font-medium text-slate-600 dark:text-slate-200">
           {showingAllProjects

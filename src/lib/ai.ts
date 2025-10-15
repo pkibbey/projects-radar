@@ -19,6 +19,8 @@ export type RepoAnalysis = {
   summary: string;
   insights: RepoInsight[];
   actions: RepoAction[];
+  packages?: string[]; // Main foundational packages (e.g., "Next.js", "Tailwind CSS", "React")
+  analysisDurationMs?: number; // Time taken to analyze the repository in milliseconds
 };
 
 const LM_STUDIO_FAILURE_MESSAGE =
@@ -49,6 +51,7 @@ const FALLBACK_ANALYSIS: RepoAnalysis = {
         "Start LM Studio locally or update LM_STUDIO_URL so the dashboard can reach your model server.",
     },
   ],
+  packages: [],
 };
 
 const prepareContext = (bundle: RepositoryBundle) => {
@@ -161,6 +164,7 @@ export const generateRepoAnalysis = async (
       summary: parsed.summary ?? FALLBACK_ANALYSIS.summary,
       insights: parsed.insights ?? FALLBACK_ANALYSIS.insights,
       actions: parsed.actions ?? FALLBACK_ANALYSIS.actions,
+      packages: parsed.packages ?? FALLBACK_ANALYSIS.packages,
     } satisfies RepoAnalysis;
 
     return analysis;

@@ -4,6 +4,8 @@ import { fetchRepositoryBundle, GitHubError } from "@/lib/github";
 import { generateRepoAnalysis } from "@/lib/ai";
 import { getGitHubToken } from "@/lib/env";
 import db from "@/lib/db";
+import { cloneRepoForAnalysis, cleanupRepo } from "@/lib/repo-cloner";
+import { analyzeCopilotWithContext, generateQuickCopilotAnalysis } from "@/lib/copilot-analyzer";
 
 export async function GET(
   _request: NextRequest,
@@ -49,7 +51,7 @@ export async function GET(
 }
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ owner: string; repo: string }> },
 ) {
   const { owner, repo } = await context.params;
@@ -72,9 +74,48 @@ export async function POST(
     });
   }
 
+  // Check if user wants to skip Copilot and use LM Studio instead
+  const url = new URL(request.url);
+  const useLmStudio = url.searchParams.get('useLmStudio') === 'true';
+  
+  // TEMPORARY: Default to LM Studio until Copilot CLI interactive mode is resolved
+  const useCopilot = url.searchParams.get('useCopilot') === 'true';
+
+  let repoPath: string | null = null;
+
   try {
     const bundle = await fetchRepositoryBundle(entry, token);
-    const analysis = await generateRepoAnalysis(bundle);
+    
+    let analysis;
+    const analysisStartTime = Date.now();
+    
+    if (!useCopilot || useLmStudio) {
+      // Use original LM Studio approach (no cloning needed) - FAST!
+      console.log(`Analyzing ${owner}/${repo} with LM Studio...`);
+      analysis = await generateRepoAnalysis(bundle);
+    } else {
+      // Clone repository and analyze with GitHub Copilot CLI
+      console.log(`Cloning repository ${owner}/${repo} for Copilot analysis...`);
+      repoPath = await cloneRepoForAnalysis(owner, repo, token);
+      
+      // Try quick analysis first (faster, simpler)
+      console.log(`Analyzing ${owner}/${repo} with GitHub Copilot (quick mode)...`);
+      
+      try {
+        analysis = await generateQuickCopilotAnalysis(repoPath, owner, repo);
+      } catch (quickError) {
+        console.warn('Quick Copilot analysis failed, trying full analysis...', quickError);
+        // Fall back to full analysis if quick fails
+        analysis = await analyzeCopilotWithContext(repoPath, owner, repo);
+      }
+    }
+    
+    const analysisDurationMs = Date.now() - analysisStartTime;
+    console.log(`Analysis completed in ${analysisDurationMs}ms`);
+    
+    // Add duration to analysis object
+    analysis = { ...analysis, analysisDurationMs };
+    
     const record = await db.upsertRepoData(owner, repo, { bundle, analysis });
 
     return new Response(JSON.stringify({ ok: true, data: record }), {
@@ -87,5 +128,10 @@ export async function POST(
       status: 500,
       headers: { "Content-Type": "application/json" },
     });
+  } finally {
+    // Always cleanup the cloned repository
+    if (repoPath) {
+      await cleanupRepo(repoPath);
+    }
   }
 }

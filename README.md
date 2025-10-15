@@ -10,8 +10,9 @@ Project Radar is a Next.js dashboard that aggregates GitHub repositories, highli
 
 - Node.js 18.18 or later
 - npm 9 or later (ships with Node)
-- A GitHub personal access token (optional but recommended)
-- A local LM Studio instance exposing an OpenAI-compatible server
+- A GitHub personal access token (required for Copilot analysis)
+- GitHub Copilot CLI (`gh copilot`) installed and authenticated
+- *(Alternative)* A local LM Studio instance exposing an OpenAI-compatible server
 
 ## Quick start
 
@@ -23,15 +24,13 @@ Project Radar is a Next.js dashboard that aggregates GitHub repositories, highli
 
 2. Copy the environment template and update values:
 
-	```bash
-	cp .env.local.example .env.local
-	```
+        ```bash
+        cp .env.local.example .env.local
+        ```
 
-	- `GITHUB_TOKEN` (recommended): enables higher rate limits, access to private repositories, and permission to sync `PROJECT_INTELLIGENCE.md` back to each repo (`repo` scope required). Without it, the dashboard shows fallback guidance instead of generating fresh intelligence.
-	- `AI_MODEL` (optional): override the default model served by LM Studio.
-	- `LM_STUDIO_URL` (optional): override the base URL for LM Studio. Defaults to `http://localhost:1234/v1`.
-
-3. Define the repositories you want to monitor by editing `src/config/projects.ts`.
+        - `GITHUB_TOKEN` (required for Copilot): enables repository cloning, higher rate limits, access to private repositories, and Copilot CLI analysis. Generate a token with `repo` scope at https://github.com/settings/tokens
+        - `AI_MODEL` (optional): override the default model served by LM Studio.
+        - `LM_STUDIO_URL` (optional): override the base URL for LM Studio. Defaults to `http://localhost:1234/v1`.3. Define the repositories you want to monitor by editing `src/config/projects.ts`.
 
 4. Launch the development server:
 
@@ -45,8 +44,12 @@ Project Radar is a Next.js dashboard that aggregates GitHub repositories, highli
 
 - Repository list: edit `projectConfig` inside `src/config/projects.ts`. Each entry accepts `owner`, `repo`, optional `branch`, and optional `displayName`.
 - Documentation files: by default the dashboard looks for `README.md`, `PROJECT_ANALYSIS.md`, `TODO.md`, and `PROJECT.md` in the repository root. Update `DEFAULT_FILES` in the same file to customize.
-- Project intelligence caching: the first time a repository is analyzed, the dashboard stores the AI output in `PROJECT_INTELLIGENCE.md`. Subsequent requests reuse that file instead of calling the model. Remove the file in GitHub if you need to regenerate it manually.
-- AI settings: ensure LM Studio exposes an OpenAI-compatible server (default `http://localhost:1234/v1`). Override `AI_MODEL` or `LM_STUDIO_URL` as needed.
+- AI Analysis: The dashboard now uses **GitHub Copilot CLI** to generate AI insights by analyzing the full repository context (code structure, dependencies, patterns). To enable:
+  1. Install the GitHub CLI: `brew install gh` (macOS) or see https://cli.github.com
+  2. Install Copilot extension: `gh extension install github/gh-copilot`
+  3. Authenticate: `gh auth login` and ensure you have Copilot access
+  4. Set `GITHUB_TOKEN` in `.env.local` for repository cloning
+- Alternative AI provider: LM Studio is still supported as a fallback. Ensure LM Studio exposes an OpenAI-compatible server (default `http://localhost:1234/v1`). Override `AI_MODEL` or `LM_STUDIO_URL` as needed.
 
 ## Available scripts
 

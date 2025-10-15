@@ -50,6 +50,8 @@ export const RepoCard = ({
     ? (analysis?.insights ?? []).slice(0, insightLimit)
     : [];
   const showTopics = hasData && isExpanded && meta.topics.length > 0;
+  const showPackages = hasData && !isList && (analysis?.packages?.length ?? 0) > 0;
+  const packages = showPackages ? (analysis?.packages ?? []) : [];
 
   const cardSpacing = isList ? "gap-4 p-4" : isCompact ? "gap-5 p-5" : "gap-6 p-6";
   const detailButtonSize = isList || isCompact ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm";
@@ -97,7 +99,7 @@ export const RepoCard = ({
               />
             )}
             <span className="text-xs text-slate-500 dark:text-slate-400">
-              {lastUpdatedText ? `Repo updated ${lastUpdatedText}` : "No cached repository data"}
+              {lastUpdatedText ? `Repo updated ${lastUpdatedText}` : "No repository data"}
             </span>
           </div>
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
@@ -111,7 +113,7 @@ export const RepoCard = ({
           >
             {hasData
               ? meta.description ?? "No description provided."
-              : "Generate cached data to pull the latest repository description and metadata from GitHub."}
+              : "Generate data to pull the latest repository description and metadata from GitHub."}
           </p>
         </div>
         <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-start">
@@ -124,7 +126,7 @@ export const RepoCard = ({
             successMessage={
               hasData
                 ? "Latest insights loaded."
-                : "Data generated. Loading fresh metrics…"
+                : ""
             }
             useDataEndpoint={true}
           />
@@ -163,6 +165,24 @@ export const RepoCard = ({
                 {metrics.map((item) => (
                   <span key={item}>{item}</span>
                 ))}
+              </div>
+            )}
+
+            {showPackages && (
+              <div>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Tech Stack
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {packages.map((pkg) => (
+                    <span
+                      key={pkg}
+                      className="inline-flex items-center rounded-md bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10 dark:bg-blue-400/10 dark:text-blue-400 dark:ring-blue-400/30"
+                    >
+                      {pkg}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -224,6 +244,12 @@ export const RepoCard = ({
       {updatedAtText && (
         <p className="text-right text-xs text-slate-400 dark:text-slate-500">
           Updated {updatedAtText}
+          {analysis?.analysisDurationMs && (
+            <>
+              {" • "}
+              Analyzed in {(analysis.analysisDurationMs / 1000).toFixed(1)}s
+            </>
+          )}
         </p>
       )}
     </article>
