@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import Datastore from "nedb-promises";
+import Database from "better-sqlite3";
 import { RepositoryBundle } from "@/lib/github";
 import type { RepoAnalysis } from "@/lib/ai";
 
@@ -17,35 +17,68 @@ type StoredValue = {
 
 export type RepoRecord = StoredValue & {
   key: string;
-  _id?: string;
+  id?: number;
 };
 
-let storePromise: Promise<Datastore<RepoRecord>> | null = null;
+let db: Database.Database | null = null;
 
-const getStore = async () => {
-  if (!storePromise) {
-    storePromise = (async () => {
-      await fs.promises.mkdir(DATA_DIR, { recursive: true });
-      const store = Datastore.create<RepoRecord>({
-        filename: DB_PATH,
-        autoload: true,
-        timestampData: true,
-      });
-      await store.ensureIndex({ fieldName: "key", unique: true });
-      return store;
-    })();
+const getDB = () => {
+  if (!db) {
+    // Ensure data directory exists
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    
+    db = new Database(DB_PATH);
+    
+    // Create table if it doesn't exist
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS repos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key TEXT UNIQUE NOT NULL,
+        bundle TEXT NOT NULL,
+        analysis TEXT,
+        updatedAt TEXT NOT NULL
+      )
+    `);
+    
+    // Create index on key for faster lookups
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_repos_key ON repos(key)`);
   }
-  return storePromise;
+  return db;
 };
 
 export const getRepoData = async (owner: string, repo: string) => {
-  const store = await getStore();
-  return store.findOne({ key: keyFor(owner, repo) });
+  const db = getDB();
+  const key = keyFor(owner, repo);
+  
+  const stmt = db.prepare('SELECT * FROM repos WHERE key = ?');
+  const row = stmt.get(key) as { id: number; key: string; bundle: string; analysis: string | null; updatedAt: string } | undefined;
+  
+  if (!row) return null;
+  
+  return {
+    key: row.key,
+    bundle: JSON.parse(row.bundle),
+    analysis: row.analysis ? JSON.parse(row.analysis) : null,
+    updatedAt: row.updatedAt,
+    id: row.id,
+  } as RepoRecord;
 };
 
 export const listRepoData = async () => {
-  const store = await getStore();
-  return store.find({});
+  const db = getDB();
+  
+  const stmt = db.prepare('SELECT * FROM repos');
+  const rows = stmt.all() as { id: number; key: string; bundle: string; analysis: string | null; updatedAt: string }[];
+  
+  return rows.map(row => ({
+    key: row.key,
+    bundle: JSON.parse(row.bundle),
+    analysis: row.analysis ? JSON.parse(row.analysis) : null,
+    updatedAt: row.updatedAt,
+    id: row.id,
+  })) as RepoRecord[];
 };
 
 export const upsertRepoData = async (
@@ -53,22 +86,35 @@ export const upsertRepoData = async (
   repo: string,
   value: { bundle: RepositoryBundle; analysis: RepoAnalysis | null },
 ) => {
-  const store = await getStore();
+  const db = getDB();
   const key = keyFor(owner, repo);
-  const payload: RepoRecord = {
+  const updatedAt = new Date().toISOString();
+  
+  const stmt = db.prepare(`
+    INSERT INTO repos (key, bundle, analysis, updatedAt)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(key) DO UPDATE SET
+      bundle = excluded.bundle,
+      analysis = excluded.analysis,
+      updatedAt = excluded.updatedAt
+  `);
+  
+  stmt.run(
     key,
-    bundle: value.bundle,
-    analysis: value.analysis,
-    updatedAt: new Date().toISOString(),
-  };
-
-  await store.update({ key }, { $set: payload }, { upsert: true });
-  return store.findOne({ key });
+    JSON.stringify(value.bundle),
+    value.analysis ? JSON.stringify(value.analysis) : null,
+    updatedAt
+  );
+  
+  return getRepoData(owner, repo);
 };
 
 export const clearRepoData = async (owner: string, repo: string) => {
-  const store = await getStore();
-  await store.remove({ key: keyFor(owner, repo) }, { multi: false });
+  const db = getDB();
+  const key = keyFor(owner, repo);
+  
+  const stmt = db.prepare('DELETE FROM repos WHERE key = ?');
+  stmt.run(key);
 };
 
 const _db = {

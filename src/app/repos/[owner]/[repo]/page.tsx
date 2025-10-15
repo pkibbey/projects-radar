@@ -125,7 +125,7 @@ export default async function RepoPage({ params }: RepoPageProps) {
             {updatedAt && (
               <span className="inline-flex items-center gap-1">
                 <Clock className="h-3 w-3" />
-                Cached {formatDistanceToNow(new Date(updatedAt), { addSuffix: true })}
+                Updated {formatDistanceToNow(new Date(updatedAt), { addSuffix: true })}
               </span>
             )}
           </div>

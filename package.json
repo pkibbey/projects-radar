@@ -11,11 +11,11 @@
   "dependencies": {
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-toggle-group": "^1.1.11",
+    "better-sqlite3": "^12.4.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.545.0",
-    "nedb-promises": "^6.2.3",
     "next": "15.5.5",
     "openai": "^6.3.0",
     "react": "19.2.0",
@@ -27,6 +27,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
     "@tailwindcss/postcss": "^4.1.14",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.7.2",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",

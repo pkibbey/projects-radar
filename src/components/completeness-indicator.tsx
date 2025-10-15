@@ -28,7 +28,7 @@ export const CompletenessIndicator = ({
   const color = getScoreColor(score);
   const label = getScoreLabel(score);
   
-  const sizeClass = size === "sm" ? "h-4 w-4" : size === "lg" ? "h-6 w-6" : "h-5 w-5";
+  const sizeClass = size === "sm" ? "h-5 w-5" : size === "lg" ? "h-6 w-6" : "h-5 w-5";
   const textSizeClass = size === "sm" ? "text-xs" : size === "lg" ? "text-sm" : "text-xs";
   
   let bgColorClass = "";

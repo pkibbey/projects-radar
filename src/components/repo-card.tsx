@@ -34,7 +34,7 @@ export const RepoCard = ({
   const lastUpdatedText = hasData
     ? formatDistanceToNow(new Date(meta.pushedAt), { addSuffix: true })
     : null;
-  const cachedAtText = lastGeneratedAt
+  const updatedAtText = lastGeneratedAt
     ? formatDistanceToNow(new Date(lastGeneratedAt), { addSuffix: true })
     : null;
 
@@ -70,7 +70,7 @@ export const RepoCard = ({
     analysis?.summary ??
     (hasData
       ? "Project data is stored, but AI insights are unavailable. Regenerate to refresh intelligence or add AI credentials."
-      : "No cached data yet. Generate repository data to populate metrics and insights.");
+      : "");
 
   return (
     <article
@@ -141,66 +141,72 @@ export const RepoCard = ({
         </div>
       </header>
 
-      <section
-        className={cn(
-          "grid gap-4",
-          showActions ? "md:grid-cols-[2fr_1fr]" : "",
-        )}
-      >
-        <div className="space-y-4">
-          {showMetrics && (
-            <div
-              className={cn(
-                "flex flex-wrap gap-3 text-xs sm:text-sm text-slate-600 dark:text-slate-300",
-                isCompact && "text-xs",
-              )}
-            >
-              {metrics.map((item) => (
-                <span key={item}>{item}</span>
-              ))}
-            </div>
+      {(showMetrics ||
+        summaryText ||
+        insights.length > 0 ||
+        showActions
+      ) && (
+        <section
+          className={cn(
+            "grid gap-4",
+            showActions ? "md:grid-cols-[2fr_1fr]" : "",
           )}
+        >
+          <div className="space-y-4">
+            {showMetrics && (
+              <div
+                className={cn(
+                  "flex flex-wrap gap-3 text-xs sm:text-sm text-slate-600 dark:text-slate-300",
+                  isCompact && "text-xs",
+                )}
+              >
+                {metrics.map((item) => (
+                  <span key={item}>{item}</span>
+                ))}
+              </div>
+            )}
 
-          <div>
-            <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
-              <Lightbulb className="h-4 w-4" /> AI Summary
-            </h3>
-            <p
-              className={cn(
-                "leading-relaxed text-slate-700 dark:text-slate-200",
-                isList ? "mt-1 text-sm" : "mt-2 text-sm",
-              )}
-            >
-              {summaryText}
-            </p>
+            {summaryText && <div>
+              <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+                <Lightbulb className="h-4 w-4" /> AI Summary
+              </h3>
+              <p
+                className={cn(
+                  "leading-relaxed text-slate-700 dark:text-slate-200",
+                  isList ? "mt-1 text-sm" : "mt-2 text-sm",
+                )}
+              >
+                {summaryText}
+              </p>
+            </div>}
+
+            {insights.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+                  <ListChecks className="h-4 w-4" /> Key insights
+                </h3>
+                <ul className="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
+                  {insights.map((insight) => (
+                    <li
+                      key={insight.title}
+                      className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800"
+                    >
+                      <p className="font-medium">{insight.title}</p>
+                      {isExpanded && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          {insight.description}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
 
-          {insights.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
-                <ListChecks className="h-4 w-4" /> Key insights
-              </h3>
-              <ul className="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
-                {insights.map((insight) => (
-                  <li
-                    key={insight.title}
-                    className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800"
-                  >
-                    <p className="font-medium">{insight.title}</p>
-                    {isExpanded && (
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {insight.description}
-                      </p>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-
-        {showActions && <RepoActionsList actions={analysis?.actions ?? []} />}
-      </section>
+          {showActions && <RepoActionsList actions={analysis?.actions ?? []} />}
+        </section>
+      )}
 
       {showTopics && (
         <footer className="flex flex-wrap gap-2">
@@ -215,9 +221,9 @@ export const RepoCard = ({
         </footer>
       )}
 
-      {cachedAtText && (
+      {updatedAtText && (
         <p className="text-right text-xs text-slate-400 dark:text-slate-500">
-          Cached {cachedAtText}
+          Updated {updatedAtText}
         </p>
       )}
     </article>
