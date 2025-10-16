@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export type SortKey = "name" | "stars" | "updated" | "completeness";
+export type SortKey = "name" | "updated" | "completeness";
 
 export const SortSelector = ({ value }: { value: SortKey }) => {
   const router = useRouter();
@@ -41,8 +41,7 @@ export const SortSelector = ({ value }: { value: SortKey }) => {
 
   const options = [
     { value: "name", label: "Name" },
-    { value: "stars", label: "Stars" },
-    { value: "updated", label: "Recently updated" },
+    { value: "updated", label: "Updated" },
     { value: "completeness", label: "Completeness" },
   ];
 

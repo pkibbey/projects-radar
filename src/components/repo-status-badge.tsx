@@ -1,4 +1,6 @@
 import { RepoStatus } from "@/lib/github";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 const STATUS_STYLES: Record<RepoStatus, string> = {
   active: "bg-emerald-500/10 text-emerald-500 ring-emerald-500/30",
@@ -15,10 +17,11 @@ const STATUS_LABEL: Record<RepoStatus, string> = {
 };
 
 export const RepoStatusBadge = ({ status }: { status: RepoStatus }) => (
-  <span
-    className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset ${STATUS_STYLES[status]}`}
+  <Badge
+    variant="outline"
+    className={cn("gap-1", STATUS_STYLES[status])}
   >
     <span className="h-2 w-2 rounded-full bg-current" aria-hidden />
     {STATUS_LABEL[status]}
-  </span>
+  </Badge>
 );

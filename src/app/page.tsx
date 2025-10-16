@@ -47,7 +47,6 @@ const buildPlaceholderBundle = (entry: ProjectConfigEntry): RepositoryBundle => 
     name: entry.repo,
     displayName: entry.displayName ?? entry.repo,
     description: null,
-    stars: 0,
     forks: 0,
     openIssues: 0,
     defaultBranch: entry.branch ?? "main",
@@ -109,9 +108,6 @@ async function DashboardContent({ viewMode, sortMode, dataFilter }: DashboardCon
   });
 
   const sortedProjects = filteredProjects.slice().sort((a, b) => {
-    if (sortMode === "stars") {
-      return b.bundle.meta.stars - a.bundle.meta.stars;
-    }
     if (sortMode === "updated") {
       return new Date(b.bundle.meta.pushedAt).getTime() - new Date(a.bundle.meta.pushedAt).getTime();
     }
@@ -137,8 +133,7 @@ async function DashboardContent({ viewMode, sortMode, dataFilter }: DashboardCon
         return acc;
       }
 
-      const { stars, forks, openIssues, watchers, pushedAt, primaryLanguage } = project.bundle.meta;
-      acc.stars += stars;
+      const { forks, openIssues, watchers, pushedAt, primaryLanguage } = project.bundle.meta;
       acc.forks += forks;
       acc.issues += openIssues;
       acc.watchers += watchers;
@@ -150,7 +145,6 @@ async function DashboardContent({ viewMode, sortMode, dataFilter }: DashboardCon
       return acc;
     },
     {
-      stars: 0,
       forks: 0,
       issues: 0,
       watchers: 0,
@@ -223,7 +217,7 @@ export default async function Home({ searchParams }: HomeProps) {
   const rawDataFilter = Array.isArray(resolvedParams.data)
     ? resolvedParams.data[0]
     : resolvedParams.data;
-  const sortMode: SortKey = rawSort === "stars" || rawSort === "updated" || rawSort === "completeness" ? rawSort : "name";
+  const sortMode: SortKey = rawSort === "updated" || rawSort === "completeness" ? rawSort : "name";
   const viewMode = isViewMode(rawView) ? rawView : DEFAULT_VIEW_MODE;
   const dataFilter = isDataFilter(rawDataFilter) ? rawDataFilter : DEFAULT_DATA_FILTER;
 

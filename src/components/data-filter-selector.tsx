@@ -53,7 +53,7 @@ export const DataFilterSelector = ({ value }: DataFilterSelectorProps) => {
   return (
     <div className="flex flex-col gap-2">
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-300">
-        Data filter
+        Filter
       </p>
       <Select value={value} onValueChange={handleChange} aria-label="Select data filter">
         <SelectTrigger className="w-full sm:w-fit">

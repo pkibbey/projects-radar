@@ -2,15 +2,20 @@
 
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import { ExternalLink, Lightbulb, ListChecks } from "lucide-react";
+import { Lightbulb, ListChecks } from "lucide-react";
+import { useState } from "react";
 import type { RepositoryBundle } from "@/lib/github";
 import type { RepoAnalysis } from "@/lib/ai";
 import { cn } from "@/lib/utils";
 import type { ViewMode } from "@/lib/view-modes";
+import { Badge } from "@/components/ui/badge";
 import { RepoStatusBadge } from "@/components/repo-status-badge";
 import { RepoActionsList } from "@/components/repo-actions-list";
 import { RepoIntelligenceRefreshButton } from "@/components/repo-intelligence-refresh-button";
 import { CompletenessIndicator } from "@/components/completeness-indicator";
+import { LanguageIcon } from "@/components/language-icon";
+import { EditableText } from "@/components/editable-text";
+import { PackageJsonCleanerButton } from "@/components/repo-package-json-cleaner-button";
 
 export type RepoCardProps = {
   bundle: RepositoryBundle;
@@ -30,10 +35,8 @@ export const RepoCard = ({
   id,
 }: RepoCardProps) => {
   const { meta } = bundle;
+  const [currentSummary, setCurrentSummary] = useState(analysis?.summary ?? "");
 
-  const lastUpdatedText = hasData
-    ? formatDistanceToNow(new Date(meta.pushedAt), { addSuffix: true })
-    : null;
   const updatedAtText = lastGeneratedAt
     ? formatDistanceToNow(new Date(lastGeneratedAt), { addSuffix: true })
     : null;
@@ -42,7 +45,6 @@ export const RepoCard = ({
   const isCompact = mode === "compact";
   const isExpanded = mode === "expanded";
 
-  const showMetrics = hasData && !isList;
   const showInsights = hasData && !isList && !isCompact;
   const showActions = hasData && isExpanded;
   const insightLimit = isExpanded ? undefined : 3;
@@ -54,25 +56,31 @@ export const RepoCard = ({
   const packages = showPackages ? (analysis?.packages ?? []) : [];
 
   const cardSpacing = isList ? "gap-4 p-4" : isCompact ? "gap-5 p-5" : "gap-6 p-6";
-  const detailButtonSize = isList || isCompact ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm";
   const refreshButtonSize = isList || isCompact ? "sm" : "md";
   const descriptionTone = isList ? "text-xs" : "text-sm";
 
-  const metrics = showMetrics
-    ? (() => {
-        const base = [];
-        if (meta.primaryLanguage) {
-          base.push(`💻 ${meta.primaryLanguage}`);
-        }
-        return base;
-      })()
-    : [];
+  const hasLanguage = hasData && meta.primaryLanguage;
 
   const summaryText =
-    analysis?.summary ??
+    currentSummary ||
     (hasData
       ? "Project data is stored, but AI insights are unavailable. Regenerate to refresh intelligence or add AI credentials."
       : "");
+
+  const handleSaveSummary = async (newSummary: string) => {
+    const response = await fetch(`/api/repos/${meta.owner}/${meta.name}/intelligence`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ summary: newSummary }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to update summary");
+    }
+
+    setCurrentSummary(newSummary);
+  };
 
   return (
     <article
@@ -91,6 +99,17 @@ export const RepoCard = ({
       >
         <div className="space-y-1">
           <div className="flex items-center gap-2">
+            {hasLanguage && (
+              <div className="flex items-center gap-2">
+                <LanguageIcon
+                  language={meta.primaryLanguage!}
+                  className={cn(
+                    "h-5 w-5",
+                    isCompact && "h-4 w-4"
+                  )}
+                />
+              </div>
+            )}
             <RepoStatusBadge status={meta.status} />
             {hasData && typeof meta.completenessScore === "number" && (
               <CompletenessIndicator
@@ -98,12 +117,11 @@ export const RepoCard = ({
                 size={isList || isCompact ? "sm" : "md"}
               />
             )}
-            <span className="text-xs text-slate-500 dark:text-slate-400">
-              {lastUpdatedText ? `Repo updated ${lastUpdatedText}` : "No repository data"}
-            </span>
           </div>
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-            {meta.displayName}
+            <Link href={`/repos/${meta.owner}/${meta.name}`}>
+              {meta.displayName}
+            </Link>
           </h2>
           <p
             className={cn(
@@ -116,12 +134,21 @@ export const RepoCard = ({
               : "Generate data to pull the latest repository description and metadata from GitHub."}
           </p>
         </div>
-        <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-start">
+        <div className="flex gap-2">
+          <PackageJsonCleanerButton
+            owner={meta.owner}
+            repo={meta.name}
+            size={refreshButtonSize}
+            onSuccess={() => {
+              // Optionally trigger a page refresh or show a notification
+              window.location.reload();
+            }}
+          />
           <RepoIntelligenceRefreshButton
             owner={meta.owner}
             repo={meta.name}
             size={refreshButtonSize}
-            idleLabel={hasData ? "Refresh data" : "Generate data"}
+            idleLabel={hasData ? "Refresh" : "Generate"}
             loadingLabel={hasData ? "Refreshing…" : "Generating…"}
             successMessage={
               hasData
@@ -130,21 +157,11 @@ export const RepoCard = ({
             }
             useDataEndpoint={true}
           />
-          <Link
-            href={`/repos/${meta.owner}/${meta.name}`}
-            className={cn(
-              "inline-flex items-center gap-2 rounded-full border border-slate-200 font-medium text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800",
-              detailButtonSize,
-            )}
-          >
-            View details
-            <ExternalLink className="h-4 w-4" />
-          </Link>
         </div>
       </header>
 
-      {(showMetrics ||
-        summaryText ||
+      {(showPackages ||
+        (summaryText && !isList) ||
         insights.length > 0 ||
         showActions
       ) && (
@@ -155,19 +172,6 @@ export const RepoCard = ({
           )}
         >
           <div className="space-y-4">
-            {showMetrics && (
-              <div
-                className={cn(
-                  "flex flex-wrap gap-3 text-xs sm:text-sm text-slate-600 dark:text-slate-300",
-                  isCompact && "text-xs",
-                )}
-              >
-                {metrics.map((item) => (
-                  <span key={item}>{item}</span>
-                ))}
-              </div>
-            )}
-
             {showPackages && (
               <div>
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -175,29 +179,27 @@ export const RepoCard = ({
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   {packages.map((pkg) => (
-                    <span
-                      key={pkg}
-                      className="inline-flex items-center rounded-md bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10 dark:bg-blue-400/10 dark:text-blue-400 dark:ring-blue-400/30"
-                    >
+                    <Badge key={pkg} variant="secondary">
                       {pkg}
-                    </span>
+                    </Badge>
                   ))}
                 </div>
               </div>
             )}
 
-            {summaryText && <div>
+            {summaryText && !isList && <div>
               <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
                 <Lightbulb className="h-4 w-4" /> AI Summary
               </h3>
-              <p
+              <EditableText
+                value={summaryText}
+                onSave={handleSaveSummary}
                 className={cn(
                   "leading-relaxed text-slate-700 dark:text-slate-200",
                   isList ? "mt-1 text-sm" : "mt-2 text-sm",
                 )}
-              >
-                {summaryText}
-              </p>
+                placeholder="No summary available. Double-click to add one."
+              />
             </div>}
 
             {insights.length > 0 && (
@@ -231,17 +233,14 @@ export const RepoCard = ({
       {showTopics && (
         <footer className="flex flex-wrap gap-2">
           {meta.topics.map((topic) => (
-            <span
-              key={topic}
-              className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-            >
+            <Badge key={topic} variant="outline">
               #{topic}
-            </span>
+            </Badge>
           ))}
         </footer>
       )}
 
-      {updatedAtText && (
+      {updatedAtText && !isList && (
         <p className="text-right text-xs text-slate-400 dark:text-slate-500">
           Updated {updatedAtText}
           {analysis?.analysisDurationMs && (

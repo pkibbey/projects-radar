@@ -2,7 +2,7 @@
 
 Project Radar is a Next.js dashboard that aggregates GitHub repositories, highlights project health signals, and produces AI generated insights and guided action plans. Each repository card surfaces:
 
-- live metadata (stars, forks, open issues, recent activity)
+- live metadata (forks, open issues, recent activity)
 - AI summaries and observations derived from root documentation files (README, PROJECT_ANALYSIS, TODO)
 - actionable checklists you can copy into your workflow
 

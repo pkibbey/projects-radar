@@ -62,7 +62,6 @@ const prepareContext = (bundle: RepositoryBundle) => {
     `Primary language: ${meta.primaryLanguage ?? "n/a"}`,
     `Status: ${meta.status}`,
     `Latest push: ${meta.pushedAt}`,
-    `Stars: ${meta.stars}, Forks: ${meta.forks}, Watchers: ${meta.watchers}`,
     `Topics: ${meta.topics.join(", ") || "none"}`,
   ];
 
@@ -186,5 +185,108 @@ export const generateRepoAnalysis = async (
       return buildFallback(bundle, error.message);
     }
     return buildFallback(bundle);
+  }
+};
+
+export type PackageJsonEnhancement = {
+  description: string;
+  keywords: string[];
+  homepage?: string;
+  repository?: {
+    type: string;
+    url: string;
+  };
+  bugs?: {
+    url: string;
+  };
+  author?: string;
+};
+
+/**
+ * Analyze package.json and generate enhanced metadata using AI
+ */
+export const enhancePackageJson = async (
+  packageJson: Record<string, unknown>,
+  repoOwner: string,
+  repoName: string,
+  readmeContent?: string,
+): Promise<PackageJsonEnhancement> => {
+  const model = getAIModel();
+
+  const client = new OpenAI({
+    apiKey: "lm-studio",
+    baseURL: getLmStudioUrl(),
+  });
+
+  if (providerHealth.status === "failed") {
+    throw new Error(providerHealth.message ?? LM_STUDIO_FAILURE_MESSAGE);
+  }
+
+  try {
+    const context = `
+Repository: ${repoOwner}/${repoName}
+Current package.json name: ${packageJson.name || 'unknown'}
+Current description: ${packageJson.description || 'none'}
+Current keywords: ${JSON.stringify(packageJson.keywords || [])}
+Dependencies: ${JSON.stringify(packageJson.dependencies || {})}
+DevDependencies: ${JSON.stringify(packageJson.devDependencies || {})}
+${readmeContent ? `\nREADME excerpt:\n${readmeContent.slice(0, 1000)}` : ''}
+`.trim();
+
+    const input = `You are a package.json metadata expert. Analyze this Node.js project and generate appropriate metadata. Respond with JSON using the shape {"description": string, "keywords": string[], "homepage": string, "repository": {"type": "git", "url": string}, "bugs": {"url": string}, "author": string}. 
+
+Guidelines:
+- description: 1-2 sentence project description (max 200 chars), clear and professional
+- keywords: 5-15 relevant keywords for npm/package discovery (lowercase, no duplicates)
+- homepage: GitHub repository URL (https://github.com/${repoOwner}/${repoName})
+- repository: Standard GitHub repository object
+- bugs: GitHub issues URL
+- author: If not present, can be inferred or set to "${repoOwner}"
+
+Context:
+${context}`;
+
+    const response = await client.responses.create({
+      model,
+      input,
+      max_output_tokens: 500,
+    });
+
+    providerHealth = { status: "ready" };
+
+    const text = response.output_text;
+    if (!text) {
+      throw new Error("AI returned empty response");
+    }
+
+    const jsonPayload = extractJson(text);
+    const parsed = JSON.parse(jsonPayload) as PackageJsonEnhancement;
+
+    // Validate and provide defaults
+    return {
+      description: parsed.description || `A Node.js project by ${repoOwner}`,
+      keywords: Array.isArray(parsed.keywords) ? parsed.keywords : [],
+      homepage: parsed.homepage || `https://github.com/${repoOwner}/${repoName}`,
+      repository: parsed.repository || {
+        type: "git",
+        url: `https://github.com/${repoOwner}/${repoName}.git`,
+      },
+      bugs: parsed.bugs || {
+        url: `https://github.com/${repoOwner}/${repoName}/issues`,
+      },
+      author: parsed.author,
+    };
+  } catch (error) {
+    if (isConnectionError(error)) {
+      providerHealth = {
+        status: "failed",
+        message: LM_STUDIO_FAILURE_MESSAGE,
+      };
+      console.error("enhancePackageJson connection error", error);
+      throw new Error(LM_STUDIO_FAILURE_MESSAGE);
+    }
+
+    console.error("enhancePackageJson error", error);
+    throw error;
   }
 };

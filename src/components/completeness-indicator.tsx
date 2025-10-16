@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 export type CompletenessIndicatorProps = {
   score: number;
@@ -28,52 +29,43 @@ export const CompletenessIndicator = ({
   const color = getScoreColor(score);
   const label = getScoreLabel(score);
   
-  const sizeClass = size === "sm" ? "h-5 w-5" : size === "lg" ? "h-6 w-6" : "h-5 w-5";
   const textSizeClass = size === "sm" ? "text-xs" : size === "lg" ? "text-sm" : "text-xs";
   
-  let bgColorClass = "";
-  let textColorClass = "";
+  let badgeColorClass = "";
+  let labelColorClass = "";
   
   if (color === "green") {
-    bgColorClass = "bg-emerald-500 ring-emerald-500/20";
-    textColorClass = "text-emerald-600 dark:text-emerald-400";
+    badgeColorClass = "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800";
+    labelColorClass = "text-emerald-600 dark:text-emerald-400";
   } else if (color === "yellow") {
-    bgColorClass = "bg-amber-500 ring-amber-500/20";
-    textColorClass = "text-amber-600 dark:text-amber-400";
+    badgeColorClass = "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800";
+    labelColorClass = "text-amber-600 dark:text-amber-400";
   } else if (color === "orange") {
-    bgColorClass = "bg-orange-500 ring-orange-500/20";
-    textColorClass = "text-orange-600 dark:text-orange-400";
+    badgeColorClass = "bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800";
+    labelColorClass = "text-orange-600 dark:text-orange-400";
   } else {
-    bgColorClass = "bg-rose-500 ring-rose-500/20";
-    textColorClass = "text-rose-600 dark:text-rose-400";
+    badgeColorClass = "bg-rose-100 text-rose-700 border-rose-300 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800";
+    labelColorClass = "text-rose-600 dark:text-rose-400";
   }
 
   return (
     <div className="flex items-center gap-1.5">
-      <div 
+      <Badge 
+        variant="outline"
         className={cn(
-          "relative flex items-center justify-center rounded-full ring-2",
-          sizeClass,
-          bgColorClass
+          "font-semibold",
+          textSizeClass,
+          badgeColorClass
         )}
         title={`Completeness: ${score}% (${label})`}
       >
-        <div 
-          className="absolute inset-0 rounded-full bg-current opacity-10"
-          aria-hidden="true"
-        />
-        <span className={cn(
-          "relative z-10 font-semibold text-white",
-          textSizeClass
-        )}>
-          {score}
-        </span>
-      </div>
+        {score}%
+      </Badge>
       {showLabel && (
         <span className={cn(
           "font-medium",
           size === "sm" ? "text-xs" : "text-sm",
-          textColorClass
+          labelColorClass
         )}>
           {label}
         </span>

@@ -18,7 +18,6 @@ export type RepositoryBundle = {
     name: string;
     displayName: string;
     description: string | null;
-    stars: number;
     forks: number;
     openIssues: number;
     defaultBranch: string;
@@ -84,7 +83,6 @@ const computeCompletenessScore = (
     topics: 10,
     hasProjectFile: 15,
     hasAnalysisFile: 15,
-    stars: 10,
     recent_activity: 10,
   };
 
@@ -116,11 +114,6 @@ const computeCompletenessScore = (
   // Has analysis files
   if (documents.some(doc => doc.path.includes('TODO') || doc.path.includes('ANALYSIS'))) {
     score += weights.hasAnalysisFile;
-  }
-
-  // Has community engagement (stars)
-  if (repoData.stargazers_count > 0) {
-    score += weights.stars;
   }
 
   // Recent activity
@@ -200,7 +193,6 @@ export const fetchRepositoryBundle = async (
       name: repo,
       displayName: displayName ?? repo,
       description: repoData.description,
-      stars: repoData.stargazers_count,
       forks: repoData.forks_count,
       openIssues: repoData.open_issues_count,
       defaultBranch: repoData.default_branch,

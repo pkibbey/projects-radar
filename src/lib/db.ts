@@ -117,11 +117,81 @@ export const clearRepoData = async (owner: string, repo: string) => {
   stmt.run(key);
 };
 
+export const updateRepoSummary = async (
+  owner: string,
+  repo: string,
+  summary: string,
+) => {
+  const db = getDB();
+  const key = keyFor(owner, repo);
+  
+  // Get existing record
+  const existing = await getRepoData(owner, repo);
+  if (!existing) return null;
+  
+  // Update the analysis with new summary
+  const updatedAnalysis = existing.analysis ? { ...existing.analysis, summary } : null;
+  const updatedAt = new Date().toISOString();
+  
+  const stmt = db.prepare(`
+    UPDATE repos
+    SET analysis = ?, updatedAt = ?
+    WHERE key = ?
+  `);
+  
+  stmt.run(
+    updatedAnalysis ? JSON.stringify(updatedAnalysis) : null,
+    updatedAt,
+    key
+  );
+  
+  return getRepoData(owner, repo);
+};
+
+export const updateRepoDescription = async (
+  owner: string,
+  repo: string,
+  description: string,
+) => {
+  const db = getDB();
+  const key = keyFor(owner, repo);
+  
+  // Get existing record
+  const existing = await getRepoData(owner, repo);
+  if (!existing) return null;
+  
+  // Update the bundle meta with new description
+  const updatedBundle = {
+    ...existing.bundle,
+    meta: {
+      ...existing.bundle.meta,
+      description,
+    },
+  };
+  const updatedAt = new Date().toISOString();
+  
+  const stmt = db.prepare(`
+    UPDATE repos
+    SET bundle = ?, updatedAt = ?
+    WHERE key = ?
+  `);
+  
+  stmt.run(
+    JSON.stringify(updatedBundle),
+    updatedAt,
+    key
+  );
+  
+  return getRepoData(owner, repo);
+};
+
 const _db = {
   getRepoData,
   listRepoData,
   upsertRepoData,
   clearRepoData,
+  updateRepoSummary,
+  updateRepoDescription,
 };
 
 export default _db;

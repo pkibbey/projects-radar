@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, RefreshCcw } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 export type RepoIntelligenceRefreshButtonProps = {
   owner: string;
@@ -62,23 +62,22 @@ export const RepoIntelligenceRefreshButton = ({
 
   return (
     <div className="flex flex-col items-end gap-1 text-right">
-      <button
+      <Button
         type="button"
         onClick={handleClick}
-        className={cn(
-          "inline-flex items-center gap-2 rounded-full border border-slate-200 font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800",
-          size === "sm" ? "px-3 py-1 text-xs" : "px-4 py-2 text-sm",
-        )}
+        variant="outline"
+        size={size === "sm" ? "sm" : "default"}
         disabled={status === "loading"}
         aria-label="Regenerate project intelligence"
+        className="rounded-full cursor-pointer"
       >
         {status === "loading" ? (
           <Loader2 className="h-4 w-4 animate-spin" />
         ) : (
           <RefreshCcw className="h-4 w-4" />
-    )}
-    {status === "loading" ? loadingLabel : idleLabel}
-      </button>
+        )}
+        {status === "loading" ? loadingLabel : idleLabel}
+      </Button>
       {message && (
         <p className="max-w-xs text-xs text-slate-500 dark:text-slate-400">
           {message}
