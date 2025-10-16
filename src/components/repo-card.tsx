@@ -16,6 +16,7 @@ import { CompletenessIndicator } from "@/components/completeness-indicator";
 import { LanguageIcon } from "@/components/language-icon";
 import { EditableText } from "@/components/editable-text";
 import { PackageJsonCleanerButton } from "@/components/repo-package-json-cleaner-button";
+import { TechStackDisplay } from "@/components/tech-stack-display";
 
 export type RepoCardProps = {
   bundle: RepositoryBundle;
@@ -163,7 +164,8 @@ export const RepoCard = ({
       {(showPackages ||
         (summaryText && !isList) ||
         insights.length > 0 ||
-        showActions
+        showActions ||
+        (hasData && analysis?.techStack)
       ) && (
         <section
           className={cn(
@@ -175,7 +177,7 @@ export const RepoCard = ({
             {showPackages && (
               <div>
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Tech Stack
+                  Tech Stack (Legacy)
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   {packages.map((pkg) => (
@@ -184,6 +186,18 @@ export const RepoCard = ({
                     </Badge>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {hasData && analysis?.techStack && (
+              <div>
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Technology Stack
+                </h3>
+                <TechStackDisplay 
+                  techStack={analysis.techStack}
+                  showEmptyCategories={isExpanded}
+                />
               </div>
             )}
 

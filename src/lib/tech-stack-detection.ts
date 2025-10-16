@@ -1,0 +1,426 @@
+/**
+ * Tech Stack Detection - Categorizes npm packages into technology categories
+ * Based on package names and known technology stacks
+ */
+
+export type TechCategory = 'frontend' | 'backend' | 'database' | 'devops' | 'testing' | 'build' | 'utility';
+
+export type TechStack = {
+  name: string;
+  category: TechCategory;
+  type?: string; // e.g., "framework", "library", "database", etc.
+};
+
+export type TechStackInfo = {
+  frontend: TechStack[];
+  backend: TechStack[];
+  database: TechStack[];
+  devops: TechStack[];
+  testing: TechStack[];
+  build: TechStack[];
+  utility: TechStack[];
+};
+
+// Comprehensive mapping of known packages to their categories
+const TECH_MAPPING: Record<string, TechStack> = {
+  // Frontend Frameworks
+  react: { name: 'React', category: 'frontend', type: 'framework' },
+  'react-dom': { name: 'React', category: 'frontend', type: 'framework' },
+  vue: { name: 'Vue', category: 'frontend', type: 'framework' },
+  'vue-next': { name: 'Vue', category: 'frontend', type: 'framework' },
+  angular: { name: 'Angular', category: 'frontend', type: 'framework' },
+  '@angular/core': { name: 'Angular', category: 'frontend', type: 'framework' },
+  svelte: { name: 'Svelte', category: 'frontend', type: 'framework' },
+  next: { name: 'Next.js', category: 'frontend', type: 'framework' },
+  'next.js': { name: 'Next.js', category: 'frontend', type: 'framework' },
+  nuxt: { name: 'Nuxt', category: 'frontend', type: 'framework' },
+  gatsby: { name: 'Gatsby', category: 'frontend', type: 'framework' },
+  remix: { name: 'Remix', category: 'frontend', type: 'framework' },
+  astro: { name: 'Astro', category: 'frontend', type: 'framework' },
+  'solid-js': { name: 'SolidJS', category: 'frontend', type: 'framework' },
+  qwik: { name: 'Qwik', category: 'frontend', type: 'framework' },
+
+  // Frontend - UI Libraries & Styling
+  'react-router': { name: 'React Router', category: 'frontend', type: 'library' },
+  'react-router-dom': { name: 'React Router', category: 'frontend', type: 'library' },
+  tailwindcss: { name: 'Tailwind CSS', category: 'frontend', type: 'styling' },
+  'tailwind-css': { name: 'Tailwind CSS', category: 'frontend', type: 'styling' },
+  'styled-components': { name: 'Styled Components', category: 'frontend', type: 'styling' },
+  sass: { name: 'Sass', category: 'frontend', type: 'styling' },
+  scss: { name: 'Sass', category: 'frontend', type: 'styling' },
+  'less': { name: 'Less', category: 'frontend', type: 'styling' },
+  postcss: { name: 'PostCSS', category: 'frontend', type: 'styling' },
+  
+  // Component Libraries
+  '@mui/material': { name: 'Material-UI', category: 'frontend', type: 'component-library' },
+  '@chakra-ui/react': { name: 'Chakra UI', category: 'frontend', type: 'component-library' },
+  bootstrap: { name: 'Bootstrap', category: 'frontend', type: 'component-library' },
+  '@nextui-org/react': { name: 'NextUI', category: 'frontend', type: 'component-library' },
+  '@radix-ui/react-dialog': { name: 'Radix UI', category: 'frontend', type: 'component-library' },
+  '@shadcn/ui': { name: 'shadcn/ui', category: 'frontend', type: 'component-library' },
+  'flowbite': { name: 'Flowbite', category: 'frontend', type: 'component-library' },
+  'daisyui': { name: 'daisyUI', category: 'frontend', type: 'component-library' },
+
+  // Frontend - State Management
+  redux: { name: 'Redux', category: 'frontend', type: 'state-management' },
+  '@reduxjs/toolkit': { name: 'Redux Toolkit', category: 'frontend', type: 'state-management' },
+  mobx: { name: 'MobX', category: 'frontend', type: 'state-management' },
+  'react-query': { name: 'React Query', category: 'frontend', type: 'state-management' },
+  '@tanstack/react-query': { name: 'TanStack Query', category: 'frontend', type: 'state-management' },
+  zustand: { name: 'Zustand', category: 'frontend', type: 'state-management' },
+  jotai: { name: 'Jotai', category: 'frontend', type: 'state-management' },
+  recoil: { name: 'Recoil', category: 'frontend', type: 'state-management' },
+  pinia: { name: 'Pinia', category: 'frontend', type: 'state-management' },
+  vuex: { name: 'Vuex', category: 'frontend', type: 'state-management' },
+
+  // Frontend - Icons & Graphics
+  'lucide-react': { name: 'Lucide Icons', category: 'frontend', type: 'icons' },
+  'react-icons': { name: 'React Icons', category: 'frontend', type: 'icons' },
+  'font-awesome': { name: 'Font Awesome', category: 'frontend', type: 'icons' },
+  'three': { name: 'Three.js', category: 'frontend', type: 'graphics' },
+  'babylonjs': { name: 'Babylon.js', category: 'frontend', type: 'graphics' },
+  'p5': { name: 'p5.js', category: 'frontend', type: 'graphics' },
+  'gsap': { name: 'GSAP', category: 'frontend', type: 'animation' },
+  'framer-motion': { name: 'Framer Motion', category: 'frontend', type: 'animation' },
+  'react-spring': { name: 'React Spring', category: 'frontend', type: 'animation' },
+
+  // Frontend - Forms & Validation
+  formik: { name: 'Formik', category: 'frontend', type: 'forms' },
+  'react-hook-form': { name: 'React Hook Form', category: 'frontend', type: 'forms' },
+  'zod': { name: 'Zod', category: 'frontend', type: 'validation' },
+  yup: { name: 'Yup', category: 'frontend', type: 'validation' },
+  joi: { name: 'Joi', category: 'frontend', type: 'validation' },
+
+  // Backend Frameworks
+  express: { name: 'Express', category: 'backend', type: 'framework' },
+  'express.js': { name: 'Express', category: 'backend', type: 'framework' },
+  fastify: { name: 'Fastify', category: 'backend', type: 'framework' },
+  '@fastify/fastify': { name: 'Fastify', category: 'backend', type: 'framework' },
+  koa: { name: 'Koa', category: 'backend', type: 'framework' },
+  nest: { name: 'NestJS', category: 'backend', type: 'framework' },
+  '@nestjs/core': { name: 'NestJS', category: 'backend', type: 'framework' },
+  hapi: { name: 'Hapi', category: 'backend', type: 'framework' },
+  'restify': { name: 'Restify', category: 'backend', type: 'framework' },
+  'micro': { name: 'Micro', category: 'backend', type: 'framework' },
+  django: { name: 'Django', category: 'backend', type: 'framework' },
+  flask: { name: 'Flask', category: 'backend', type: 'framework' },
+  rails: { name: 'Rails', category: 'backend', type: 'framework' },
+  laravel: { name: 'Laravel', category: 'backend', type: 'framework' },
+  symfony: { name: 'Symfony', category: 'backend', type: 'framework' },
+  spring: { name: 'Spring', category: 'backend', type: 'framework' },
+
+  // Backend - APIs & GraphQL
+  apollo: { name: 'Apollo', category: 'backend', type: 'graphql' },
+  '@apollo/server': { name: 'Apollo Server', category: 'backend', type: 'graphql' },
+  graphql: { name: 'GraphQL', category: 'backend', type: 'graphql' },
+  'graphql-core': { name: 'GraphQL', category: 'backend', type: 'graphql' },
+  'prisma': { name: 'Prisma', category: 'backend', type: 'orm' },
+  '@prisma/client': { name: 'Prisma', category: 'backend', type: 'orm' },
+  typeorm: { name: 'TypeORM', category: 'backend', type: 'orm' },
+  sequelize: { name: 'Sequelize', category: 'backend', type: 'orm' },
+  knex: { name: 'Knex.js', category: 'backend', type: 'query-builder' },
+  hasura: { name: 'Hasura', category: 'backend', type: 'graphql' },
+
+  // Backend - Authentication
+  passport: { name: 'Passport', category: 'backend', type: 'auth' },
+  jsonwebtoken: { name: 'JWT', category: 'backend', type: 'auth' },
+  'next-auth': { name: 'NextAuth.js', category: 'backend', type: 'auth' },
+  '@auth/nextjs': { name: 'Auth.js', category: 'backend', type: 'auth' },
+
+  // Backend - Utilities
+  axios: { name: 'Axios', category: 'utility', type: 'http-client' },
+  fetch: { name: 'Fetch', category: 'utility', type: 'http-client' },
+  'node-fetch': { name: 'Node Fetch', category: 'utility', type: 'http-client' },
+  lodash: { name: 'Lodash', category: 'utility', type: 'utility' },
+  'date-fns': { name: 'date-fns', category: 'utility', type: 'date' },
+  dayjs: { name: 'Day.js', category: 'utility', type: 'date' },
+  moment: { name: 'Moment.js', category: 'utility', type: 'date' },
+  dotenv: { name: 'dotenv', category: 'utility', type: 'config' },
+
+  // Database
+  postgres: { name: 'PostgreSQL', category: 'database', type: 'database' },
+  postgresql: { name: 'PostgreSQL', category: 'database', type: 'database' },
+  mysql: { name: 'MySQL', category: 'database', type: 'database' },
+  mongodb: { name: 'MongoDB', category: 'database', type: 'database' },
+  mongoose: { name: 'Mongoose', category: 'database', type: 'database' },
+  sqlite: { name: 'SQLite', category: 'database', type: 'database' },
+  'better-sqlite3': { name: 'SQLite', category: 'database', type: 'database' },
+  redis: { name: 'Redis', category: 'database', type: 'cache' },
+  elasticsearch: { name: 'Elasticsearch', category: 'database', type: 'search' },
+  dynamodb: { name: 'DynamoDB', category: 'database', type: 'database' },
+  firestore: { name: 'Firestore', category: 'database', type: 'database' },
+  supabase: { name: 'Supabase', category: 'database', type: 'database' },
+
+  // DevOps & Cloud
+  docker: { name: 'Docker', category: 'devops', type: 'containerization' },
+  kubernetes: { name: 'Kubernetes', category: 'devops', type: 'orchestration' },
+  terraform: { name: 'Terraform', category: 'devops', type: 'infrastructure' },
+  serverless: { name: 'Serverless', category: 'devops', type: 'framework' },
+  aws: { name: 'AWS', category: 'devops', type: 'cloud' },
+  '@aws-sdk/client-s3': { name: 'AWS', category: 'devops', type: 'cloud' },
+  vercel: { name: 'Vercel', category: 'devops', type: 'deployment' },
+  netlify: { name: 'Netlify', category: 'devops', type: 'deployment' },
+  heroku: { name: 'Heroku', category: 'devops', type: 'deployment' },
+
+  // Testing
+  jest: { name: 'Jest', category: 'testing', type: 'testing-framework' },
+  mocha: { name: 'Mocha', category: 'testing', type: 'testing-framework' },
+  vitest: { name: 'Vitest', category: 'testing', type: 'testing-framework' },
+  cypress: { name: 'Cypress', category: 'testing', type: 'e2e' },
+  playwright: { name: 'Playwright', category: 'testing', type: 'e2e' },
+  selenium: { name: 'Selenium', category: 'testing', type: 'e2e' },
+  '@testing-library/react': { name: 'React Testing Library', category: 'testing', type: 'testing-library' },
+  '@testing-library/vue': { name: 'Vue Testing Library', category: 'testing', type: 'testing-library' },
+  chai: { name: 'Chai', category: 'testing', type: 'assertion' },
+  sinon: { name: 'Sinon', category: 'testing', type: 'mocking' },
+  faker: { name: 'Faker', category: 'testing', type: 'mock-data' },
+  '@faker-js/faker': { name: 'Faker', category: 'testing', type: 'mock-data' },
+
+  // Build Tools
+  webpack: { name: 'Webpack', category: 'build', type: 'bundler' },
+  vite: { name: 'Vite', category: 'build', type: 'bundler' },
+  rollup: { name: 'Rollup', category: 'build', type: 'bundler' },
+  parcel: { name: 'Parcel', category: 'build', type: 'bundler' },
+  esbuild: { name: 'esbuild', category: 'build', type: 'bundler' },
+  turbopack: { name: 'Turbopack', category: 'build', type: 'bundler' },
+  gulp: { name: 'Gulp', category: 'build', type: 'task-runner' },
+  grunt: { name: 'Grunt', category: 'build', type: 'task-runner' },
+  typescript: { name: 'TypeScript', category: 'build', type: 'language' },
+
+  // Linting & Code Quality
+  eslint: { name: 'ESLint', category: 'build', type: 'linter' },
+  prettier: { name: 'Prettier', category: 'build', type: 'formatter' },
+  husky: { name: 'Husky', category: 'build', type: 'git-hooks' },
+  'lint-staged': { name: 'Lint Staged', category: 'build', type: 'git-hooks' },
+  commitlint: { name: 'Commitlint', category: 'build', type: 'git-hooks' },
+};
+
+/**
+ * Extracts and categorizes the tech stack from dependencies
+ * @param dependencies - The dependencies object from package.json
+ * @param devDependencies - The devDependencies object from package.json
+ * @param peerDependencies - The peerDependencies object from package.json
+ * @returns Array of categorized tech stacks
+ */
+export function detectTechStack(
+  dependencies?: Record<string, string>,
+  devDependencies?: Record<string, string>,
+  peerDependencies?: Record<string, string>,
+): TechStack[] {
+  const allDeps = {
+    ...(peerDependencies || {}),
+    ...(dependencies || {}),
+    ...(devDependencies || {}),
+  };
+
+  const detected = new Map<string, TechStack>();
+
+  for (const [packageName] of Object.entries(allDeps)) {
+    const normalizedName = packageName.toLowerCase();
+    
+    // Check exact match first
+    let match = TECH_MAPPING[normalizedName];
+    
+    // Check for scoped packages (@org/package)
+    if (!match && normalizedName.includes('/')) {
+      const parts = normalizedName.split('/');
+      const mainPart = parts[1];
+      match = TECH_MAPPING[mainPart];
+    }
+    
+    // Check for partial matches (e.g., @mui/material matches @mui)
+    if (!match) {
+      for (const [key, value] of Object.entries(TECH_MAPPING)) {
+        if (normalizedName.includes(key) || key.includes(normalizedName.split('/')[normalizedName.includes('/') ? 1 : 0])) {
+          match = value;
+          break;
+        }
+      }
+    }
+    
+    if (match) {
+      // Use the tech name as key to avoid duplicates (e.g., react and react-dom both map to "React")
+      detected.set(match.name, match);
+    }
+  }
+
+  return Array.from(detected.values());
+}
+
+/**
+ * Groups tech stack by category
+ */
+export function groupTechStackByCategory(techStack: TechStack[]): Record<TechCategory, TechStack[]> {
+  const grouped: Record<TechCategory, TechStack[]> = {
+    frontend: [],
+    backend: [],
+    database: [],
+    devops: [],
+    testing: [],
+    build: [],
+    utility: [],
+  };
+
+  for (const tech of techStack) {
+    grouped[tech.category].push(tech);
+  }
+
+  return grouped;
+}
+
+/**
+ * Gets a display-friendly label for a category
+ */
+export function getCategoryLabel(category: TechCategory): string {
+  const labels: Record<TechCategory, string> = {
+    frontend: 'Frontend',
+    backend: 'Backend',
+    database: 'Database',
+    devops: 'DevOps & Cloud',
+    testing: 'Testing',
+    build: 'Build Tools',
+    utility: 'Utilities',
+  };
+  return labels[category];
+}
+
+/**
+ * Gets a color for a category (useful for UI)
+ */
+export function getCategoryColor(category: TechCategory): string {
+  const colors: Record<TechCategory, string> = {
+    frontend: 'bg-blue-100 text-blue-800',
+    backend: 'bg-purple-100 text-purple-800',
+    database: 'bg-green-100 text-green-800',
+    devops: 'bg-yellow-100 text-yellow-800',
+    testing: 'bg-red-100 text-red-800',
+    build: 'bg-gray-100 text-gray-800',
+    utility: 'bg-slate-100 text-slate-800',
+  };
+  return colors[category];
+}
+
+/**
+ * Detects Swift framework and libraries from source code patterns
+ */
+export function detectSwiftTechStack(sourceContent: string): TechStack[] {
+  const detected = new Map<string, TechStack>();
+  const lowerContent = sourceContent.toLowerCase();
+
+  // Swift frameworks and libraries
+  const swiftPatterns: Record<string, TechStack> = {
+    'import SwiftUI': { name: 'SwiftUI', category: 'frontend', type: 'framework' },
+    'import UIKit': { name: 'UIKit', category: 'frontend', type: 'framework' },
+    'import AppKit': { name: 'AppKit', category: 'frontend', type: 'framework' },
+    'import Foundation': { name: 'Foundation', category: 'backend', type: 'library' },
+    'import Combine': { name: 'Combine', category: 'backend', type: 'reactive' },
+    'import Alamofire': { name: 'Alamofire', category: 'backend', type: 'http-client' },
+    'import Moya': { name: 'Moya', category: 'backend', type: 'http-client' },
+    'import RealmSwift': { name: 'Realm', category: 'database', type: 'database' },
+    'import FirebaseCore': { name: 'Firebase', category: 'backend', type: 'platform' },
+    'import Firebase': { name: 'Firebase', category: 'backend', type: 'platform' },
+    'import RxSwift': { name: 'RxSwift', category: 'backend', type: 'reactive' },
+    'import SnapKit': { name: 'SnapKit', category: 'frontend', type: 'layout' },
+    'import Kingfisher': { name: 'Kingfisher', category: 'utility', type: 'image-loading' },
+    'import SwiftyJSON': { name: 'SwiftyJSON', category: 'utility', type: 'json' },
+    'import ObjectMapper': { name: 'ObjectMapper', category: 'utility', type: 'mapping' },
+    'import XCTest': { name: 'XCTest', category: 'testing', type: 'testing-framework' },
+    'import Quick': { name: 'Quick', category: 'testing', type: 'testing-framework' },
+    'import Nimble': { name: 'Nimble', category: 'testing', type: 'assertion' },
+  };
+
+  for (const [pattern, tech] of Object.entries(swiftPatterns)) {
+    if (lowerContent.includes(pattern.toLowerCase())) {
+      detected.set(tech.name, tech);
+    }
+  }
+
+  // Detect Swift language itself
+  detected.set('Swift', { name: 'Swift', category: 'backend', type: 'language' });
+
+  return Array.from(detected.values());
+}
+
+/**
+ * Detects C++ and Arduino libraries from source code patterns
+ */
+export function detectCppArduinoTechStack(sourceContent: string): TechStack[] {
+  const detected = new Map<string, TechStack>();
+  const lowerContent = sourceContent.toLowerCase();
+
+  // C++ and Arduino patterns
+  const cppPatterns: Record<string, TechStack> = {
+    '#include <Arduino.h>': { name: 'Arduino', category: 'backend', type: 'platform' },
+    '#include "Arduino.h"': { name: 'Arduino', category: 'backend', type: 'platform' },
+    'setup()': { name: 'Arduino', category: 'backend', type: 'platform' },
+    'loop()': { name: 'Arduino', category: 'backend', type: 'platform' },
+    '#include <WiFi.h>': { name: 'WiFi (Arduino)', category: 'backend', type: 'library' },
+    '#include <Adafruit': { name: 'Adafruit Libraries', category: 'backend', type: 'libraries' },
+    '#include <SPI.h>': { name: 'SPI', category: 'backend', type: 'protocol' },
+    '#include <Wire.h>': { name: 'I2C/Wire', category: 'backend', type: 'protocol' },
+    '#include <MQTT': { name: 'MQTT', category: 'backend', type: 'protocol' },
+    '#include <HTTPClient.h>': { name: 'HTTP Client', category: 'backend', type: 'http-client' },
+    '#include <ESP': { name: 'ESP32/ESP8266', category: 'backend', type: 'microcontroller' },
+    '#include <NeoPixel': { name: 'NeoPixel', category: 'utility', type: 'led-library' },
+    '#include <Servo.h>': { name: 'Servo', category: 'utility', type: 'library' },
+    '#include <LiquidCrystal': { name: 'LiquidCrystal', category: 'utility', type: 'display' },
+    '#include <DHT': { name: 'DHT Sensor Library', category: 'utility', type: 'sensor-library' },
+  };
+
+  for (const [pattern, tech] of Object.entries(cppPatterns)) {
+    if (lowerContent.includes(pattern.toLowerCase())) {
+      detected.set(tech.name, tech);
+    }
+  }
+
+  // Detect C++ language itself
+  detected.set('C++', { name: 'C++', category: 'backend', type: 'language' });
+
+  return Array.from(detected.values());
+}
+
+/**
+ * Detects HTML/CSS/JavaScript frameworks and libraries from source code patterns
+ */
+export function detectHtmlTechStack(sourceContent: string): TechStack[] {
+  const detected = new Map<string, TechStack>();
+  const lowerContent = sourceContent.toLowerCase();
+
+  // HTML/CSS/JS framework patterns
+  const htmlPatterns: Record<string, TechStack> = {
+    '<meta name="viewport"': { name: 'HTML5', category: 'frontend', type: 'markup' },
+    '<!DOCTYPE html>': { name: 'HTML5', category: 'frontend', type: 'markup' },
+    'bootstrap': { name: 'Bootstrap', category: 'frontend', type: 'framework' },
+    'tailwind': { name: 'Tailwind CSS', category: 'frontend', type: 'styling' },
+    'w-': { name: 'Tailwind CSS', category: 'frontend', type: 'styling' },
+    'flex': { name: 'Flexbox', category: 'frontend', type: 'css' },
+    'grid': { name: 'CSS Grid', category: 'frontend', type: 'css' },
+    '@media': { name: 'CSS Media Queries', category: 'frontend', type: 'css' },
+    'font-awesome': { name: 'Font Awesome', category: 'frontend', type: 'icons' },
+    'material-icons': { name: 'Material Icons', category: 'frontend', type: 'icons' },
+    '<script': { name: 'JavaScript', category: 'frontend', type: 'language' },
+    'const ': { name: 'JavaScript', category: 'frontend', type: 'language' },
+    'function ': { name: 'JavaScript', category: 'frontend', type: 'language' },
+    'fetch(': { name: 'Fetch API', category: 'frontend', type: 'api' },
+    'axios': { name: 'Axios', category: 'frontend', type: 'http-client' },
+    'jquery': { name: 'jQuery', category: 'frontend', type: 'library' },
+    'react': { name: 'React', category: 'frontend', type: 'framework' },
+    'vue': { name: 'Vue', category: 'frontend', type: 'framework' },
+    'angular': { name: 'Angular', category: 'frontend', type: 'framework' },
+    'alpine': { name: 'Alpine.js', category: 'frontend', type: 'framework' },
+    'htmx': { name: 'HTMX', category: 'frontend', type: 'library' },
+    '<style': { name: 'CSS', category: 'frontend', type: 'styling' },
+    'css': { name: 'CSS', category: 'frontend', type: 'styling' },
+  };
+
+  for (const [pattern, tech] of Object.entries(htmlPatterns)) {
+    if (lowerContent.includes(pattern.toLowerCase())) {
+      detected.set(tech.name, tech);
+    }
+  }
+
+  // Detect HTML itself
+  detected.set('HTML', { name: 'HTML', category: 'frontend', type: 'markup' });
+
+  return Array.from(detected.values());
+}

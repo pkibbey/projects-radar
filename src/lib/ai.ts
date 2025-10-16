@@ -4,6 +4,7 @@ import {
   RepositoryBundle,
 } from "@/lib/github";
 import { getAIModel, getLmStudioUrl } from "@/lib/env";
+import type { TechStackInfo } from "@/lib/tech-stack-detection";
 
 export type RepoInsight = {
   title: string;
@@ -20,6 +21,7 @@ export type RepoAnalysis = {
   insights: RepoInsight[];
   actions: RepoAction[];
   packages?: string[]; // Main foundational packages (e.g., "Next.js", "Tailwind CSS", "React")
+  techStack?: TechStackInfo; // Categorized tech stack extracted from package.json
   analysisDurationMs?: number; // Time taken to analyze the repository in milliseconds
 };
 

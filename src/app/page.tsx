@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { projectConfig, type ProjectConfigEntry } from "@/config/projects";
 import db from "@/lib/db";
 import type { RepositoryBundle } from "@/lib/github";
@@ -119,14 +120,6 @@ async function DashboardContent({ viewMode, sortMode, dataFilter }: DashboardCon
     return a.bundle.meta.displayName.localeCompare(b.bundle.meta.displayName);
   });
 
-  const staleProjects = sortedProjects
-    .filter((project) => !project.hasData)
-    .map((project) => ({
-      owner: project.bundle.meta.owner,
-      repo: project.bundle.meta.name,
-      displayName: project.bundle.meta.displayName,
-    }));
-
   const aggregateStats = filteredProjects.reduce(
     (acc, project) => {
       if (!project.hasData) {
@@ -239,6 +232,12 @@ export default async function Home({ searchParams }: HomeProps) {
           )}
         </div>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-6">
+          <Link 
+            href="/analytics"
+            className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+          >
+            📊 Tech Trends
+          </Link>
           <DataFilterSelector value={dataFilter} />
           <SortSelector value={sortMode} />
           <ViewModeSwitcher value={viewMode} />

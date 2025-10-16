@@ -6,6 +6,7 @@ import { getGitHubToken } from "@/lib/env";
 import db from "@/lib/db";
 import { cloneRepoForAnalysis, cleanupRepo } from "@/lib/repo-cloner";
 import { analyzeCopilotWithContext, generateQuickCopilotAnalysis } from "@/lib/copilot-analyzer";
+import { fetchAndExtractTechStack } from "@/lib/tech-stack-fetcher";
 
 export async function GET(
   _request: NextRequest,
@@ -108,6 +109,19 @@ export async function POST(
         // Fall back to full analysis if quick fails
         analysis = await analyzeCopilotWithContext(repoPath, owner, repo);
       }
+    }
+    
+    // Fetch and extract tech stack from package.json
+    console.log(`Extracting tech stack for ${owner}/${repo}...`);
+    const techStack = await fetchAndExtractTechStack(
+      owner,
+      repo,
+      entry.branch,
+      token
+    );
+    
+    if (techStack) {
+      analysis.techStack = techStack;
     }
     
     const analysisDurationMs = Date.now() - analysisStartTime;
