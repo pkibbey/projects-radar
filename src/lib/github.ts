@@ -32,6 +32,9 @@ export type RepositoryBundle = {
     watchers: number;
     license: string | null;
     completenessScore?: number;
+    isPrivate: boolean;
+    isFork: boolean;
+    archived: boolean;
   };
   documents: RepoDocument[];
 };
@@ -247,6 +250,9 @@ export const fetchRepositoryBundle = async (
       watchers: repoData.subscribers_count ?? 0,
       license: repoData.license?.name ?? null,
       completenessScore,
+      isPrivate: Boolean(repoData.private),
+      isFork: Boolean(repoData.fork),
+      archived: Boolean(repoData.archived),
     },
     documents,
   };
