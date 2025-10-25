@@ -1,7 +1,6 @@
 "use client";
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { ArrowUp, ArrowDown } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -9,17 +8,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export type SortKey = "name" | "updated" | "completeness";
 export type SortOrder = "asc" | "desc";
 
 type SortSelectorProps = {
   value: SortKey;
-  order?: SortOrder;
 };
 
-export const SortSelector = ({ value, order = "asc" }: SortSelectorProps) => {
+export const SortSelector = ({ value }: SortSelectorProps) => {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -47,28 +44,6 @@ export const SortSelector = ({ value, order = "asc" }: SortSelectorProps) => {
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   };
 
-  const handleOrderChange = (nextOrder: string) => {
-    if (!["asc", "desc"].includes(nextOrder)) {
-      return;
-    }
-
-    const params = new URLSearchParams();
-    if (searchParams) {
-      for (const k of searchParams.keys()) {
-        const v = searchParams.get(k) ?? "";
-        params.set(k, v);
-      }
-    }
-
-    if (nextOrder === "asc") {
-      params.delete("order");
-    } else {
-      params.set("order", nextOrder);
-    }
-    const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-  };
-
   const options = [
     { value: "name", label: "Name" },
     { value: "updated", label: "Updated" },
@@ -76,11 +51,11 @@ export const SortSelector = ({ value, order = "asc" }: SortSelectorProps) => {
   ];
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex gap-3 items-center">
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-300">
         Sort
       </p>
-      <div className="flex gap-2">
+      <div className="flex gap-3 items-center">
         <Select value={value} onValueChange={handleSortChange} aria-label="Select sort">
           <SelectTrigger className="w-full sm:w-fit">
             <SelectValue />
@@ -92,29 +67,7 @@ export const SortSelector = ({ value, order = "asc" }: SortSelectorProps) => {
               </SelectItem>
             ))}
           </SelectContent>
-        </Select>
-        
-        <ToggleGroup
-          type="single"
-          value={order}
-          onValueChange={handleOrderChange}
-          className="border border-slate-200 dark:border-slate-800 rounded-md"
-        >
-          <ToggleGroupItem
-            value="asc"
-            aria-label="Sort ascending"
-            className="px-3"
-          >
-            <ArrowUp className="h-4 w-4" />
-          </ToggleGroupItem>
-          <ToggleGroupItem
-            value="desc"
-            aria-label="Sort descending"
-            className="px-3"
-          >
-            <ArrowDown className="h-4 w-4" />
-          </ToggleGroupItem>
-        </ToggleGroup>
+        </Select>        
       </div>
     </div>
   );

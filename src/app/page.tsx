@@ -1,18 +1,18 @@
 import { Suspense } from "react";
-import Link from "next/link";
 import { fetchUserRepositories, type GitHubUserRepo } from "@/lib/github-user-repos";
 import { getGitHubOwner, getGitHubToken } from "@/lib/env";
 import db from "@/lib/db";
 import type { RepositoryBundle } from "@/lib/github";
 import type { RepoAnalysis } from "@/lib/ai";
 import { RepoCard } from "@/components/repo-card";
-import { SortSelector, type SortKey } from "@/components/sort-selector";
+import { SortSelector, type SortKey, type SortOrder } from "@/components/sort-selector";
 import { DataFilterSelector } from "@/components/data-filter-selector";
 import {
   DEFAULT_DATA_FILTER,
   isDataFilter,
   type DataFilter,
 } from "@/lib/data-filters";
+import { OrderSelector } from "@/components/order-selector";
 
 export const dynamic = "force-dynamic";
 
@@ -50,10 +50,11 @@ const keyForEntry = (entry: GitHubUserRepo) => `${entry.owner.toLowerCase()}/${e
 
 type DashboardContentProps = {
   sortMode: SortKey;
+  sortOrder: SortOrder;
   dataFilter: DataFilter;
 };
 
-async function DashboardContent({ sortMode, dataFilter }: DashboardContentProps) {
+async function DashboardContent({ sortMode, sortOrder, dataFilter }: DashboardContentProps) {
   const records = await db.listRepoData();
   const recordMap = new Map(records.map((record) => [record.key, record]));
 
@@ -95,15 +96,19 @@ async function DashboardContent({ sortMode, dataFilter }: DashboardContentProps)
   });
 
   const sortedProjects = filteredProjects.slice().sort((a, b) => {
+    let compareResult = 0;
+    
     if (sortMode === "updated") {
-      return new Date(b.bundle.meta.pushedAt).getTime() - new Date(a.bundle.meta.pushedAt).getTime();
-    }
-    if (sortMode === "completeness") {
+      compareResult = new Date(b.bundle.meta.pushedAt).getTime() - new Date(a.bundle.meta.pushedAt).getTime();
+    } else if (sortMode === "completeness") {
       const as = a.bundle.meta.completenessScore ?? 0;
       const bs = b.bundle.meta.completenessScore ?? 0;
-      return bs - as;
+      compareResult = bs - as;
+    } else {
+      compareResult = a.bundle.meta.displayName.localeCompare(b.bundle.meta.displayName);
     }
-    return a.bundle.meta.displayName.localeCompare(b.bundle.meta.displayName);
+    
+    return sortOrder === "desc" ? -compareResult : compareResult;
   });
 
   const aggregateStats = filteredProjects.reduce(
@@ -192,12 +197,15 @@ export default async function Home({ searchParams }: HomeProps) {
   const rawDataFilter = Array.isArray(resolvedParams.data)
     ? resolvedParams.data[0]
     : resolvedParams.data;
+  const rawOrder = Array.isArray(resolvedParams.order) ? resolvedParams.order[0] : resolvedParams.order;
+  
   const sortMode: SortKey = rawSort === "updated" || rawSort === "completeness" ? rawSort : "name";
   const dataFilter = isDataFilter(rawDataFilter) ? rawDataFilter : DEFAULT_DATA_FILTER;
+  const sortOrder: SortOrder = rawOrder === "desc" ? "desc" : "asc";
 
   return (
     <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-10 px-6 py-12">
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <header className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <p className="text-sm font-medium text-indigo-500">Project Radar</p>
           <h1 className="text-3xl font-semibold text-slate-900 dark:text-slate-100">
@@ -213,19 +221,14 @@ export default async function Home({ searchParams }: HomeProps) {
           )}
         </div>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-6">
-          <Link 
-            href="/analytics"
-            className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
-          >
-            📊 Tech Trends
-          </Link>
           <DataFilterSelector value={dataFilter} />
           <SortSelector value={sortMode} />
+          <OrderSelector order={sortOrder} />
         </div>
       </header>
 
       <Suspense fallback={<p className="text-sm text-slate-500">Loading repositories…</p>}>
-        <DashboardContent sortMode={sortMode} dataFilter={dataFilter} />
+        <DashboardContent sortMode={sortMode} sortOrder={sortOrder} dataFilter={dataFilter} />
       </Suspense>
     </div>
   );

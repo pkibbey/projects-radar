@@ -14,7 +14,6 @@ import { RepoIntelligenceRefreshButton } from "@/components/repo-intelligence-re
 import { CompletenessIndicator } from "@/components/completeness-indicator";
 import { LanguageIcon } from "@/components/language-icon";
 import { EditableText } from "@/components/editable-text";
-import { PackageJsonCleanerButton } from "@/components/repo-package-json-cleaner-button";
 import { TechStackDisplay } from "@/components/tech-stack-display";
 
 type RepoCardProps = {
@@ -131,16 +130,7 @@ export const RepoCard = ({
               : "Generate data to pull the latest repository description and metadata from GitHub."}
           </p>
         </div>
-        <div className="flex gap-2">
-          <PackageJsonCleanerButton
-            owner={meta.owner}
-            repo={meta.name}
-            size={refreshButtonSize}
-            onSuccess={() => {
-              // Optionally trigger a page refresh or show a notification
-              window.location.reload();
-            }}
-          />
+        <div className="flex gap-2">          
           <RepoIntelligenceRefreshButton
             owner={meta.owner}
             repo={meta.name}
