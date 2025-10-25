@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export type RepoIntelligenceRefreshButtonProps = {
+type RepoIntelligenceRefreshButtonProps = {
   owner: string;
   repo: string;
   size?: "sm" | "md";
@@ -13,6 +13,7 @@ export type RepoIntelligenceRefreshButtonProps = {
   idleLabel?: string;
   loadingLabel?: string;
   successMessage?: string;
+  onSuccess?: (data: Record<string, unknown>) => void;
 };
 
 export const RepoIntelligenceRefreshButton = ({
@@ -23,6 +24,7 @@ export const RepoIntelligenceRefreshButton = ({
   idleLabel = "Regenerate AI",
   loadingLabel = "Processing…",
   successMessage = "Latest data loaded.",
+  onSuccess,
 }: RepoIntelligenceRefreshButtonProps) => {
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -45,8 +47,15 @@ export const RepoIntelligenceRefreshButton = ({
         throw new Error(payload.error ?? "Failed to trigger regeneration.");
       }
 
+      const data = await response.json();
       setStatus("success");
       setMessage(successMessage);
+      
+      // Call the onSuccess callback with the updated data
+      if (onSuccess) {
+        onSuccess(data);
+      }
+      
       router.refresh();
     } catch (error) {
       setStatus("error");
@@ -58,7 +67,7 @@ export const RepoIntelligenceRefreshButton = ({
         setStatus("idle");
       }, 4000);
     }
-  }, [owner, repo, status, successMessage, useDataEndpoint, router]);
+  }, [owner, repo, status, successMessage, useDataEndpoint, router, onSuccess]);
 
   return (
     <div className="flex flex-col items-end gap-1 text-right">

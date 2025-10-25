@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 
-export type EditableTextProps = {
+type EditableTextProps = {
   value: string;
   onSave: (newValue: string) => Promise<void>;
   className?: string;

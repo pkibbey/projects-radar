@@ -1,15 +1,14 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ArrowLeft, ExternalLink, Lightbulb, Clock } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { projectConfig } from "@/config/projects";
+import { fetchUserRepositories } from "@/lib/github-user-repos";
+import { getGitHubOwner, getGitHubToken } from "@/lib/env";
 import { fetchRepositoryBundle } from "@/lib/github";
 import {
   buildFallback,
 } from "@/lib/ai";
-import { getGitHubToken } from "@/lib/env";
 import { Button } from "@/components/ui/button";
 import { RepoStatusBadge } from "@/components/repo-status-badge";
 import { RepoActionsList } from "@/components/repo-actions-list";
@@ -18,8 +17,17 @@ import db from "@/lib/db";
 
 export const revalidate = 60;
 
-export const generateStaticParams = () =>
-  projectConfig.map((entry) => ({ owner: entry.owner, repo: entry.repo }));
+export const generateStaticParams = async () => {
+  try {
+    const owner = getGitHubOwner();
+    const token = getGitHubToken();
+    const repos = await fetchUserRepositories(owner, token);
+    return repos.map((repo) => ({ owner: repo.owner, repo: repo.repo }));
+  } catch (error) {
+    console.error("Failed to generate static params:", error);
+    return [];
+  }
+};
 
 type RepoPageProps = {
   params: Promise<{
@@ -47,14 +55,6 @@ const MarkdownPanel = ({
 
 export default async function RepoPage({ params }: RepoPageProps) {
   const resolvedParams = await params;
-  const entry = projectConfig.find(
-    (item) =>
-      item.owner === resolvedParams.owner && item.repo === resolvedParams.repo,
-  );
-
-  if (!entry) {
-    notFound();
-  }
 
   const token = getGitHubToken();
   
@@ -63,6 +63,8 @@ export default async function RepoPage({ params }: RepoPageProps) {
   
   // If no cached data, fetch from GitHub as fallback
   if (!record && token) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const entry = { owner: resolvedParams.owner, repo: resolvedParams.repo } as any;
     const bundle = await fetchRepositoryBundle(entry, token);
     const analysis = buildFallback(
       bundle,
@@ -181,7 +183,7 @@ export default async function RepoPage({ params }: RepoPageProps) {
           )}
         </div>
 
-        <RepoActionsList actions={analysis.actions} />
+        <RepoActionsList actions={analysis.actions} layout="sidebar" />
       </section>
     </div>
   );

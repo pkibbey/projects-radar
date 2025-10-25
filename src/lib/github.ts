@@ -8,6 +8,7 @@ export type RepoDocument = {
   content: string;
   url?: string;
   sha?: string;
+  type?: 'source' | 'config' | 'documentation';
 };
 
 export type RepoStatus = "active" | "maintenance" | "stale" | "archived";
@@ -158,9 +159,48 @@ export const fetchRepositoryBundle = async (
 
   const documents: RepoDocument[] = [];
   
-  // Only fetch documents if enabled (default: true)
-  if (fetchDocuments && DEFAULT_FILES.length > 0) {
+  // Fetch source code and config files for analysis (prioritized over markdown docs)
+  if (DEFAULT_FILES.length > 0) {
     for (const path of DEFAULT_FILES) {
+      const fileResponse = await fetch(
+        `${GITHUB_API}/repos/${owner}/${repo}/contents/${path}${branch ? `?ref=${branch}` : ""}`,
+        {
+          headers,
+          next: { revalidate: 300 },
+        },
+      );
+
+      if (!fileResponse.ok) {
+        continue;
+      }
+
+      const fileData = await fileResponse.json();
+      if (fileData.type === "file" && typeof fileData.content === "string") {
+        // Determine file type
+        let fileType: 'source' | 'config' | 'documentation' = 'source';
+        if (path.match(/\.(md|markdown|txt)$/i)) {
+          fileType = 'documentation';
+        } else if (path.match(/(config|package\.json|tsconfig|docker|compose|requirements|cargo|go\.mod)/i)) {
+          fileType = 'config';
+        }
+
+        documents.push({
+          path,
+          content: decodeBase64(fileData.content),
+          url: fileData.html_url,
+          sha: fileData.sha,
+          type: fileType,
+        });
+      }
+    }
+  }
+  
+  // Legacy: Only fetch markdown documents if explicitly enabled
+  if (fetchDocuments) {
+    const legacyDocs = ["PROJECT_ANALYSIS.md", "TODO.md", "PROJECT.md"];
+    for (const path of legacyDocs) {
+      if (documents.some(d => d.path === path)) continue; // Skip if already fetched
+      
       const fileResponse = await fetch(
         `${GITHUB_API}/repos/${owner}/${repo}/contents/${path}${branch ? `?ref=${branch}` : ""}`,
         {
@@ -180,6 +220,7 @@ export const fetchRepositoryBundle = async (
           content: decodeBase64(fileData.content),
           url: fileData.html_url,
           sha: fileData.sha,
+          type: 'documentation',
         });
       }
     }

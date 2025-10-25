@@ -1,25 +1,14 @@
 import { NextRequest } from "next/server";
-import { projectConfig } from "@/config/projects";
 import { fetchRepositoryBundle } from "@/lib/github";
 import { generateRepoAnalysis } from "@/lib/ai";
 import { getGitHubToken } from "@/lib/env";
 import db from "@/lib/db";
 
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   context: { params: Promise<{ owner: string; repo: string }> },
 ) {
   const { owner, repo } = await context.params;
-  const entry = projectConfig.find(
-    (item) => item.owner.toLowerCase() === owner.toLowerCase() && item.repo.toLowerCase() === repo.toLowerCase(),
-  );
-
-  if (!entry) {
-    return new Response(JSON.stringify({ error: "Repository is not configured." }), {
-      status: 404,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
 
   const token = getGitHubToken();
   if (!token) {
@@ -30,6 +19,8 @@ export async function POST(
   }
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const entry = { owner, repo } as any;
     const bundle = await fetchRepositoryBundle(entry, token);
     const analysis = await generateRepoAnalysis(bundle);
     const record = await db.upsertRepoData(owner, repo, { bundle, analysis });

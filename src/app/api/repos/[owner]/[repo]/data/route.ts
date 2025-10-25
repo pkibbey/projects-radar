@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import { projectConfig } from "@/config/projects";
 import { fetchRepositoryBundle, GitHubError } from "@/lib/github";
 import { generateRepoAnalysis } from "@/lib/ai";
 import { getGitHubToken } from "@/lib/env";
@@ -13,16 +12,6 @@ export async function GET(
   context: { params: Promise<{ owner: string; repo: string }> },
 ) {
   const { owner, repo } = await context.params;
-  const entry = projectConfig.find(
-    (item) => item.owner.toLowerCase() === owner.toLowerCase() && item.repo.toLowerCase() === repo.toLowerCase(),
-  );
-
-  if (!entry) {
-    return new Response(JSON.stringify({ error: "Repository is not configured." }), {
-      status: 404,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
 
   try {
     const cached = await db.getRepoData(owner, repo);
@@ -56,16 +45,6 @@ export async function POST(
   context: { params: Promise<{ owner: string; repo: string }> },
 ) {
   const { owner, repo } = await context.params;
-  const entry = projectConfig.find(
-    (item) => item.owner.toLowerCase() === owner.toLowerCase() && item.repo.toLowerCase() === repo.toLowerCase(),
-  );
-
-  if (!entry) {
-    return new Response(JSON.stringify({ error: "Repository is not configured." }), {
-      status: 404,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
 
   const token = getGitHubToken();
   if (!token) {
@@ -85,6 +64,9 @@ export async function POST(
   let repoPath: string | null = null;
 
   try {
+    // Create a temporary entry object for fetchRepositoryBundle
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const entry = { owner, repo } as any;
     const bundle = await fetchRepositoryBundle(entry, token);
     
     let analysis;
@@ -116,7 +98,7 @@ export async function POST(
     const techStack = await fetchAndExtractTechStack(
       owner,
       repo,
-      entry.branch,
+      undefined,
       token
     );
     

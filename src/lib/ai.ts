@@ -5,6 +5,7 @@ import {
 } from "@/lib/github";
 import { getAIModel, getLmStudioUrl } from "@/lib/env";
 import type { TechStackInfo } from "@/lib/tech-stack-detection";
+import { analyzeSourceCodeStructure, formatSourceCodeContext } from "@/lib/source-code-analyzer";
 
 export type RepoInsight = {
   title: string;
@@ -58,7 +59,9 @@ const FALLBACK_ANALYSIS: RepoAnalysis = {
 
 const prepareContext = (bundle: RepositoryBundle) => {
   const { meta, documents } = bundle;
-  const lines: string[] = [
+  
+  // Build base context from repository metadata
+  const baseContext = [
     `Repository: ${meta.owner}/${meta.name}`,
     `Description: ${meta.description ?? "n/a"}`,
     `Primary language: ${meta.primaryLanguage ?? "n/a"}`,
@@ -67,12 +70,38 @@ const prepareContext = (bundle: RepositoryBundle) => {
     `Topics: ${meta.topics.join(", ") || "none"}`,
   ];
 
-  for (const doc of documents) {
-    const excerpt = doc.content.slice(0, 2000);
-    lines.push(`\nFile: ${doc.path}\n${excerpt}`);
+  // Analyze source code structure if documents are available
+  let sourceCodeContext = "";
+  if (documents.length > 0) {
+    try {
+      // Create a map of file contents for analysis
+      const filesMap = new Map<string, string>();
+      for (const doc of documents) {
+        filesMap.set(doc.path, doc.content);
+      }
+
+      // Analyze the source code structure
+      const analysis = analyzeSourceCodeStructure(filesMap);
+      
+      // Format and include source code context
+      sourceCodeContext = "\n\n## Project Architecture Analysis\n" + formatSourceCodeContext(analysis, meta.name);
+      
+      // Also include specific important files
+      const sourceFiles = documents.filter(d => d.type === 'source').slice(0, 3);
+      if (sourceFiles.length > 0) {
+        sourceCodeContext += "\n\n## Key Source Files";
+        for (const file of sourceFiles) {
+          // Include first 200 chars of each key file for context
+          const preview = file.content.substring(0, 200).replace(/\n/g, " ");
+          sourceCodeContext += `\n- ${file.path}: ${preview}...`;
+        }
+      }
+    } catch (error) {
+      console.warn("Failed to analyze source code structure:", error);
+    }
   }
 
-  return lines.join("\n");
+  return baseContext.join("\n") + sourceCodeContext;
 };
 
 const extractJson = (text: string) => {
@@ -93,10 +122,10 @@ const extractJson = (text: string) => {
   return trimmed;
 };
 
-export const buildFallback = (bundle: RepositoryBundle, summary?: string): RepoAnalysis => ({
+export const buildFallback = (_bundle: RepositoryBundle, summary?: string): RepoAnalysis => ({
   ...FALLBACK_ANALYSIS,
   summary:
-    summary ?? bundle.documents[0]?.content.slice(0, 280) ?? FALLBACK_ANALYSIS.summary,
+    summary ?? FALLBACK_ANALYSIS.summary,
 });
 
 const isConnectionError = (error: unknown): boolean => {
@@ -143,7 +172,36 @@ export const generateRepoAnalysis = async (
   }
 
   try {
-    const input = `You are an engineering operations co-pilot. Analyze the following repository context and respond with JSON using the shape {"summary": string, "insights": Array<{"title": string, "description": string}>, "actions": Array<{"title": string, "instruction": string}>}. Each insight should be concise but actionable. Focus on project health, potential risks, and next steps. Context:\n\n${prepareContext(bundle)}`;
+    const input = `You are an engineering operations co-pilot specializing in source code analysis. 
+Analyze the following repository, focusing on the actual source code structure, architecture patterns, 
+and implementation details rather than documentation. Respond with JSON using this exact shape:
+{
+  "summary": string,
+  "insights": Array<{"title": string, "description": string}>,
+  "actions": Array<{"title": string, "instruction": string}>
+}
+
+Guidelines for the summary:
+- Write a 1-3 sentence description based on observed code structure and patterns
+- Focus on what the code reveals about the project's purpose and architecture
+- Include the primary technology stack when evident from the codebase
+- Be specific about implementation approach rather than generic
+
+Guidelines for insights (3-5 items):
+- Focus on architectural patterns you observe in the code
+- Comment on code organization and project structure
+- Note technology choices evident in the codebase
+- Identify strengths and potential areas of concern from the code
+- Avoid assumptions; ground observations in actual code structure
+
+Guidelines for actions (3-5 items):
+- Provide actionable next steps based on code analysis
+- Suggest improvements to code organization or structure
+- Recommend testing or documentation based on what you observe
+- Propose technology enhancements based on current stack
+
+Context:
+${prepareContext(bundle)}`;
 
     const response = await client.responses.create({
       model,

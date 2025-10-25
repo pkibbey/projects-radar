@@ -9,7 +9,7 @@ import {
 } from "@/lib/tech-stack-detection";
 import type { TechStackInfo } from "@/lib/tech-stack-detection";
 
-export type TechStackDisplayProps = {
+type TechStackDisplayProps = {
   techStack: TechStackInfo;
   showEmptyCategories?: boolean;
 };

@@ -1,19 +1,13 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { projectConfig, type ProjectConfigEntry } from "@/config/projects";
+import { fetchUserRepositories, type GitHubUserRepo } from "@/lib/github-user-repos";
+import { getGitHubOwner, getGitHubToken } from "@/lib/env";
 import db from "@/lib/db";
 import type { RepositoryBundle } from "@/lib/github";
 import type { RepoAnalysis } from "@/lib/ai";
 import { RepoCard } from "@/components/repo-card";
-import { ViewModeSwitcher } from "@/components/view-mode-switcher";
 import { SortSelector, type SortKey } from "@/components/sort-selector";
 import { DataFilterSelector } from "@/components/data-filter-selector";
-import { cn } from "@/lib/utils";
-import {
-  DEFAULT_VIEW_MODE,
-  isViewMode,
-  type ViewMode,
-} from "@/lib/view-modes";
 import {
   DEFAULT_DATA_FILTER,
   isDataFilter,
@@ -22,27 +16,15 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const gridLayoutByMode: Record<ViewMode, string> = {
-  list: "grid-cols-1",
-  compact: "grid-cols-1 sm:grid-cols-2",
-  expanded: "grid-cols-1",
-};
-
-const gridGapByMode: Record<ViewMode, string> = {
-  list: "gap-4",
-  compact: "gap-5",
-  expanded: "gap-8",
-};
-
 type ProjectRow = {
-  entry: ProjectConfigEntry;
+  entry: GitHubUserRepo;
   bundle: RepositoryBundle;
   analysis: RepoAnalysis | null;
   hasData: boolean;
   updatedAt?: string | null;
 };
 
-const buildPlaceholderBundle = (entry: ProjectConfigEntry): RepositoryBundle => ({
+const buildPlaceholderBundle = (entry: GitHubUserRepo): RepositoryBundle => ({
   meta: {
     owner: entry.owner,
     name: entry.repo,
@@ -50,8 +32,8 @@ const buildPlaceholderBundle = (entry: ProjectConfigEntry): RepositoryBundle => 
     description: null,
     forks: 0,
     openIssues: 0,
-    defaultBranch: entry.branch ?? "main",
-    branch: entry.branch ?? "main",
+    defaultBranch: "main",
+    branch: "main",
     pushedAt: new Date(0).toISOString(),
     htmlUrl: `https://github.com/${entry.owner}/${entry.repo}`,
     primaryLanguage: null,
@@ -64,19 +46,23 @@ const buildPlaceholderBundle = (entry: ProjectConfigEntry): RepositoryBundle => 
   documents: [],
 });
 
-const keyForEntry = (entry: ProjectConfigEntry) => `${entry.owner.toLowerCase()}/${entry.repo.toLowerCase()}`;
+const keyForEntry = (entry: GitHubUserRepo) => `${entry.owner.toLowerCase()}/${entry.repo.toLowerCase()}`;
 
 type DashboardContentProps = {
-  viewMode: ViewMode;
   sortMode: SortKey;
   dataFilter: DataFilter;
 };
 
-async function DashboardContent({ viewMode, sortMode, dataFilter }: DashboardContentProps) {
+async function DashboardContent({ sortMode, dataFilter }: DashboardContentProps) {
   const records = await db.listRepoData();
   const recordMap = new Map(records.map((record) => [record.key, record]));
 
-  const projects: ProjectRow[] = projectConfig.map((entry) => {
+  // Fetch all repositories for the configured GitHub owner
+  const owner = getGitHubOwner();
+  const token = getGitHubToken();
+  const repos = await fetchUserRepositories(owner, token);
+
+  const projects: ProjectRow[] = repos.map((entry) => {
     const record = recordMap.get(keyForEntry(entry)) ?? null;
     const bundle = record?.bundle ?? buildPlaceholderBundle(entry);
     return {
@@ -92,7 +78,7 @@ async function DashboardContent({ viewMode, sortMode, dataFilter }: DashboardCon
     return (
       <div className="mx-auto max-w-2xl text-center text-sm text-slate-600 dark:text-slate-300">
         <p className="font-medium">
-          No repositories configured. Populate `projectConfig` to get started.
+          No repositories found. Set `GITHUB_OWNER` in your environment to get started.
         </p>
       </div>
     );
@@ -158,8 +144,8 @@ async function DashboardContent({ viewMode, sortMode, dataFilter }: DashboardCon
       <section className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
         <span className="font-medium text-slate-600 dark:text-slate-200">
           {showingAllProjects
-            ? `${totalProjects} repositories configured`
-            : `Showing ${filteredProjects.length} of ${totalProjects} repositories`}
+            ? `${totalProjects} repositories from ${owner}`
+            : `Showing ${filteredProjects.length} of ${totalProjects} repositories from ${owner}`}
         </span>
         {cachedCount > 0 && <span>📦 {cachedCount} cached</span>}
         {cachedCount > 0 && (
@@ -179,7 +165,7 @@ async function DashboardContent({ viewMode, sortMode, dataFilter }: DashboardCon
           No repositories match this filter.
         </p>
       ) : (
-        <div className={cn("grid", gridGapByMode[viewMode], gridLayoutByMode[viewMode])}>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {sortedProjects.map((project) => (
             <RepoCard
               key={`${project.bundle.meta.owner}/${project.bundle.meta.name}`}
@@ -187,7 +173,6 @@ async function DashboardContent({ viewMode, sortMode, dataFilter }: DashboardCon
               analysis={project.analysis}
               hasData={project.hasData}
               lastGeneratedAt={project.updatedAt ?? undefined}
-              mode={viewMode}
               id={`${project.bundle.meta.owner}-${project.bundle.meta.name}`}
             />
           ))}
@@ -202,16 +187,12 @@ type HomeProps = {
 };
 
 export default async function Home({ searchParams }: HomeProps) {
-  const resolvedParams = searchParams ? await searchParams : {};
-  const rawView = Array.isArray(resolvedParams.view)
-    ? resolvedParams.view[0]
-    : resolvedParams.view;
+  const resolvedParams = searchParams ? await searchParams : {};  
   const rawSort = Array.isArray(resolvedParams.sort) ? resolvedParams.sort[0] : resolvedParams.sort;
   const rawDataFilter = Array.isArray(resolvedParams.data)
     ? resolvedParams.data[0]
     : resolvedParams.data;
   const sortMode: SortKey = rawSort === "updated" || rawSort === "completeness" ? rawSort : "name";
-  const viewMode = isViewMode(rawView) ? rawView : DEFAULT_VIEW_MODE;
   const dataFilter = isDataFilter(rawDataFilter) ? rawDataFilter : DEFAULT_DATA_FILTER;
 
   return (
@@ -240,12 +221,11 @@ export default async function Home({ searchParams }: HomeProps) {
           </Link>
           <DataFilterSelector value={dataFilter} />
           <SortSelector value={sortMode} />
-          <ViewModeSwitcher value={viewMode} />
         </div>
       </header>
 
       <Suspense fallback={<p className="text-sm text-slate-500">Loading repositories…</p>}>
-        <DashboardContent viewMode={viewMode} sortMode={sortMode} dataFilter={dataFilter} />
+        <DashboardContent sortMode={sortMode} dataFilter={dataFilter} />
       </Suspense>
     </div>
   );

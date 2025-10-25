@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { ArrowUp, ArrowDown } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -8,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   DATA_FILTER_LABELS,
   DEFAULT_DATA_FILTER,
@@ -20,16 +22,19 @@ const FILTER_OPTIONS: Array<{ value: DataFilter; label: string }> = [
   { value: "without-data", label: DATA_FILTER_LABELS["without-data"] },
 ];
 
-export type DataFilterSelectorProps = {
+export type FilterOrder = "asc" | "desc";
+
+type DataFilterSelectorProps = {
   value: DataFilter;
+  order?: FilterOrder;
 };
 
-export const DataFilterSelector = ({ value }: DataFilterSelectorProps) => {
+export const DataFilterSelector = ({ value, order = "asc" }: DataFilterSelectorProps) => {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const handleChange = (nextValue: string) => {
+  const handleFilterChange = (nextValue: string) => {
     if (!FILTER_OPTIONS.some((option) => option.value === nextValue)) {
       return;
     }
@@ -50,23 +55,63 @@ export const DataFilterSelector = ({ value }: DataFilterSelectorProps) => {
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   };
 
+  const handleOrderChange = (nextOrder: string) => {
+    if (!["asc", "desc"].includes(nextOrder)) {
+      return;
+    }
+
+    const params = new URLSearchParams(searchParams);
+    if (nextOrder === "asc") {
+      params.delete("filterOrder");
+    } else {
+      params.set("filterOrder", nextOrder);
+    }
+
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
+
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-300">
         Filter
       </p>
-      <Select value={value} onValueChange={handleChange} aria-label="Select data filter">
-        <SelectTrigger className="w-full sm:w-fit">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {FILTER_OPTIONS.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <div className="flex gap-2">
+        <Select value={value} onValueChange={handleFilterChange} aria-label="Select data filter">
+          <SelectTrigger className="w-full sm:w-fit">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {FILTER_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <ToggleGroup
+          type="single"
+          value={order}
+          onValueChange={handleOrderChange}
+          className="border border-slate-200 dark:border-slate-800 rounded-md"
+        >
+          <ToggleGroupItem
+            value="asc"
+            aria-label="Filter ascending"
+            className="px-3"
+          >
+            <ArrowUp className="h-4 w-4" />
+          </ToggleGroupItem>
+          <ToggleGroupItem
+            value="desc"
+            aria-label="Filter descending"
+            className="px-3"
+          >
+            <ArrowDown className="h-4 w-4" />
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </div>
     </div>
   );
 };

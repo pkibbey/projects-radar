@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
-export type CompletenessIndicatorProps = {
+type CompletenessIndicatorProps = {
   score: number;
   size?: "sm" | "md" | "lg";
   showLabel?: boolean;
