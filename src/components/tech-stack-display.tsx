@@ -21,11 +21,7 @@ export const TechStackDisplay = ({
   const categories: TechCategory[] = [
     "frontend",
     "backend", 
-    "database",
-    "devops",
     "testing",
-    "build",
-    "utility",
   ];
 
   const renderTechItem = (tech: TechStack) => (
@@ -40,7 +36,7 @@ export const TechStackDisplay = ({
   );
 
   return (
-    <div className="space-y-4">
+    <div className="flex gap-2">
       {categories.map((category) => {
         const items = techStack[category] || [];
 
@@ -49,16 +45,11 @@ export const TechStackDisplay = ({
         }
 
         return (
-          <div key={category}>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              {getCategoryLabel(category)} {items.length > 0 && `(${items.length})`}
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {items.map(renderTechItem)}
-              {items.length === 0 && (
-                <span className="text-xs text-slate-400">None detected</span>
-              )}
-            </div>
+          <div className="flex flex-wrap gap-2" key={category}>
+            {items.map(renderTechItem)}
+            {items.length === 0 && (
+              <span className="text-xs text-slate-400">None detected</span>
+            )}
           </div>
         );
       })}

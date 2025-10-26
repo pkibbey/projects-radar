@@ -183,7 +183,7 @@ export default async function RepoPage({ params }: RepoPageProps) {
           )}
         </div>
 
-        <RepoActionsList actions={analysis.actions} layout="sidebar" />
+        <RepoActionsList actions={analysis.actions} />
       </section>
     </div>
   );

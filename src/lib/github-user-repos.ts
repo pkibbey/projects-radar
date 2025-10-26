@@ -67,7 +67,6 @@ export const fetchUserRepositories = async (
     }
 
     const data = await response.json();
-    console.log(`Fetched ${data.length} repositories on page ${page}.`);
 
     if (!Array.isArray(data) || data.length === 0) {
       hasMore = false;

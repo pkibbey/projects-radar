@@ -3,7 +3,7 @@
  * Based on package names and known technology stacks
  */
 
-export type TechCategory = 'frontend' | 'backend' | 'database' | 'devops' | 'testing' | 'build' | 'utility';
+export type TechCategory = 'frontend' | 'backend' | 'testing';
 
 export type TechStack = {
   name: string;
@@ -14,11 +14,7 @@ export type TechStack = {
 export type TechStackInfo = {
   frontend: TechStack[];
   backend: TechStack[];
-  database: TechStack[];
-  devops: TechStack[];
   testing: TechStack[];
-  build: TechStack[];
-  utility: TechStack[];
 };
 
 // Comprehensive mapping of known packages to their categories
@@ -127,40 +123,40 @@ const TECH_MAPPING: Record<string, TechStack> = {
   'next-auth': { name: 'NextAuth.js', category: 'backend', type: 'auth' },
   '@auth/nextjs': { name: 'Auth.js', category: 'backend', type: 'auth' },
 
-  // Backend - Utilities
-  axios: { name: 'Axios', category: 'utility', type: 'http-client' },
-  fetch: { name: 'Fetch', category: 'utility', type: 'http-client' },
-  'node-fetch': { name: 'Node Fetch', category: 'utility', type: 'http-client' },
-  lodash: { name: 'Lodash', category: 'utility', type: 'utility' },
-  'date-fns': { name: 'date-fns', category: 'utility', type: 'date' },
-  dayjs: { name: 'Day.js', category: 'utility', type: 'date' },
-  moment: { name: 'Moment.js', category: 'utility', type: 'date' },
-  dotenv: { name: 'dotenv', category: 'utility', type: 'config' },
+  // Backend - Utilities & Tools
+  axios: { name: 'Axios', category: 'backend', type: 'http-client' },
+  fetch: { name: 'Fetch', category: 'backend', type: 'http-client' },
+  'node-fetch': { name: 'Node Fetch', category: 'backend', type: 'http-client' },
+  lodash: { name: 'Lodash', category: 'backend', type: 'utility' },
+  'date-fns': { name: 'date-fns', category: 'backend', type: 'date' },
+  dayjs: { name: 'Day.js', category: 'backend', type: 'date' },
+  moment: { name: 'Moment.js', category: 'backend', type: 'date' },
+  dotenv: { name: 'dotenv', category: 'backend', type: 'config' },
 
-  // Database
-  postgres: { name: 'PostgreSQL', category: 'database', type: 'database' },
-  postgresql: { name: 'PostgreSQL', category: 'database', type: 'database' },
-  mysql: { name: 'MySQL', category: 'database', type: 'database' },
-  mongodb: { name: 'MongoDB', category: 'database', type: 'database' },
-  mongoose: { name: 'Mongoose', category: 'database', type: 'database' },
-  sqlite: { name: 'SQLite', category: 'database', type: 'database' },
-  'better-sqlite3': { name: 'SQLite', category: 'database', type: 'database' },
-  redis: { name: 'Redis', category: 'database', type: 'cache' },
-  elasticsearch: { name: 'Elasticsearch', category: 'database', type: 'search' },
-  dynamodb: { name: 'DynamoDB', category: 'database', type: 'database' },
-  firestore: { name: 'Firestore', category: 'database', type: 'database' },
-  supabase: { name: 'Supabase', category: 'database', type: 'database' },
+  // Backend - Databases
+  postgres: { name: 'PostgreSQL', category: 'backend', type: 'database' },
+  postgresql: { name: 'PostgreSQL', category: 'backend', type: 'database' },
+  mysql: { name: 'MySQL', category: 'backend', type: 'database' },
+  mongodb: { name: 'MongoDB', category: 'backend', type: 'database' },
+  mongoose: { name: 'Mongoose', category: 'backend', type: 'database' },
+  sqlite: { name: 'SQLite', category: 'backend', type: 'database' },
+  'better-sqlite3': { name: 'SQLite', category: 'backend', type: 'database' },
+  redis: { name: 'Redis', category: 'backend', type: 'cache' },
+  elasticsearch: { name: 'Elasticsearch', category: 'backend', type: 'search' },
+  dynamodb: { name: 'DynamoDB', category: 'backend', type: 'database' },
+  firestore: { name: 'Firestore', category: 'backend', type: 'database' },
+  supabase: { name: 'Supabase', category: 'backend', type: 'database' },
 
-  // DevOps & Cloud
-  docker: { name: 'Docker', category: 'devops', type: 'containerization' },
-  kubernetes: { name: 'Kubernetes', category: 'devops', type: 'orchestration' },
-  terraform: { name: 'Terraform', category: 'devops', type: 'infrastructure' },
-  serverless: { name: 'Serverless', category: 'devops', type: 'framework' },
-  aws: { name: 'AWS', category: 'devops', type: 'cloud' },
-  '@aws-sdk/client-s3': { name: 'AWS', category: 'devops', type: 'cloud' },
-  vercel: { name: 'Vercel', category: 'devops', type: 'deployment' },
-  netlify: { name: 'Netlify', category: 'devops', type: 'deployment' },
-  heroku: { name: 'Heroku', category: 'devops', type: 'deployment' },
+  // Backend - DevOps & Cloud
+  docker: { name: 'Docker', category: 'backend', type: 'containerization' },
+  kubernetes: { name: 'Kubernetes', category: 'backend', type: 'orchestration' },
+  terraform: { name: 'Terraform', category: 'backend', type: 'infrastructure' },
+  serverless: { name: 'Serverless', category: 'backend', type: 'framework' },
+  aws: { name: 'AWS', category: 'backend', type: 'cloud' },
+  '@aws-sdk/client-s3': { name: 'AWS', category: 'backend', type: 'cloud' },
+  vercel: { name: 'Vercel', category: 'backend', type: 'deployment' },
+  netlify: { name: 'Netlify', category: 'backend', type: 'deployment' },
+  heroku: { name: 'Heroku', category: 'backend', type: 'deployment' },
 
   // Testing
   jest: { name: 'Jest', category: 'testing', type: 'testing-framework' },
@@ -176,23 +172,23 @@ const TECH_MAPPING: Record<string, TechStack> = {
   faker: { name: 'Faker', category: 'testing', type: 'mock-data' },
   '@faker-js/faker': { name: 'Faker', category: 'testing', type: 'mock-data' },
 
-  // Build Tools
-  webpack: { name: 'Webpack', category: 'build', type: 'bundler' },
-  vite: { name: 'Vite', category: 'build', type: 'bundler' },
-  rollup: { name: 'Rollup', category: 'build', type: 'bundler' },
-  parcel: { name: 'Parcel', category: 'build', type: 'bundler' },
-  esbuild: { name: 'esbuild', category: 'build', type: 'bundler' },
-  turbopack: { name: 'Turbopack', category: 'build', type: 'bundler' },
-  gulp: { name: 'Gulp', category: 'build', type: 'task-runner' },
-  grunt: { name: 'Grunt', category: 'build', type: 'task-runner' },
-  typescript: { name: 'TypeScript', category: 'build', type: 'language' },
+  // Backend - Build Tools & Languages
+  webpack: { name: 'Webpack', category: 'backend', type: 'bundler' },
+  vite: { name: 'Vite', category: 'backend', type: 'bundler' },
+  rollup: { name: 'Rollup', category: 'backend', type: 'bundler' },
+  parcel: { name: 'Parcel', category: 'backend', type: 'bundler' },
+  esbuild: { name: 'esbuild', category: 'backend', type: 'bundler' },
+  turbopack: { name: 'Turbopack', category: 'backend', type: 'bundler' },
+  gulp: { name: 'Gulp', category: 'backend', type: 'task-runner' },
+  grunt: { name: 'Grunt', category: 'backend', type: 'task-runner' },
+  typescript: { name: 'TypeScript', category: 'backend', type: 'language' },
 
-  // Linting & Code Quality
-  eslint: { name: 'ESLint', category: 'build', type: 'linter' },
-  prettier: { name: 'Prettier', category: 'build', type: 'formatter' },
-  husky: { name: 'Husky', category: 'build', type: 'git-hooks' },
-  'lint-staged': { name: 'Lint Staged', category: 'build', type: 'git-hooks' },
-  commitlint: { name: 'Commitlint', category: 'build', type: 'git-hooks' },
+  // Backend - Linting & Code Quality
+  eslint: { name: 'ESLint', category: 'backend', type: 'linter' },
+  prettier: { name: 'Prettier', category: 'backend', type: 'formatter' },
+  husky: { name: 'Husky', category: 'backend', type: 'git-hooks' },
+  'lint-staged': { name: 'Lint Staged', category: 'backend', type: 'git-hooks' },
+  commitlint: { name: 'Commitlint', category: 'backend', type: 'git-hooks' },
 };
 
 /**
@@ -254,11 +250,7 @@ export function groupTechStackByCategory(techStack: TechStack[]): Record<TechCat
   const grouped: Record<TechCategory, TechStack[]> = {
     frontend: [],
     backend: [],
-    database: [],
-    devops: [],
     testing: [],
-    build: [],
-    utility: [],
   };
 
   for (const tech of techStack) {
@@ -275,11 +267,7 @@ export function getCategoryLabel(category: TechCategory): string {
   const labels: Record<TechCategory, string> = {
     frontend: 'Frontend',
     backend: 'Backend',
-    database: 'Database',
-    devops: 'DevOps & Cloud',
     testing: 'Testing',
-    build: 'Build Tools',
-    utility: 'Utilities',
   };
   return labels[category];
 }
@@ -291,11 +279,7 @@ export function getCategoryColor(category: TechCategory): string {
   const colors: Record<TechCategory, string> = {
     frontend: 'bg-blue-100 text-blue-800',
     backend: 'bg-purple-100 text-purple-800',
-    database: 'bg-green-100 text-green-800',
-    devops: 'bg-yellow-100 text-yellow-800',
     testing: 'bg-red-100 text-red-800',
-    build: 'bg-gray-100 text-gray-800',
-    utility: 'bg-slate-100 text-slate-800',
   };
   return colors[category];
 }
@@ -316,14 +300,14 @@ export function detectSwiftTechStack(sourceContent: string): TechStack[] {
     'import Combine': { name: 'Combine', category: 'backend', type: 'reactive' },
     'import Alamofire': { name: 'Alamofire', category: 'backend', type: 'http-client' },
     'import Moya': { name: 'Moya', category: 'backend', type: 'http-client' },
-    'import RealmSwift': { name: 'Realm', category: 'database', type: 'database' },
+    'import RealmSwift': { name: 'Realm', category: 'backend', type: 'database' },
     'import FirebaseCore': { name: 'Firebase', category: 'backend', type: 'platform' },
     'import Firebase': { name: 'Firebase', category: 'backend', type: 'platform' },
     'import RxSwift': { name: 'RxSwift', category: 'backend', type: 'reactive' },
     'import SnapKit': { name: 'SnapKit', category: 'frontend', type: 'layout' },
-    'import Kingfisher': { name: 'Kingfisher', category: 'utility', type: 'image-loading' },
-    'import SwiftyJSON': { name: 'SwiftyJSON', category: 'utility', type: 'json' },
-    'import ObjectMapper': { name: 'ObjectMapper', category: 'utility', type: 'mapping' },
+    'import Kingfisher': { name: 'Kingfisher', category: 'backend', type: 'image-loading' },
+    'import SwiftyJSON': { name: 'SwiftyJSON', category: 'backend', type: 'json' },
+    'import ObjectMapper': { name: 'ObjectMapper', category: 'backend', type: 'mapping' },
     'import XCTest': { name: 'XCTest', category: 'testing', type: 'testing-framework' },
     'import Quick': { name: 'Quick', category: 'testing', type: 'testing-framework' },
     'import Nimble': { name: 'Nimble', category: 'testing', type: 'assertion' },
@@ -361,10 +345,10 @@ export function detectCppArduinoTechStack(sourceContent: string): TechStack[] {
     '#include <MQTT': { name: 'MQTT', category: 'backend', type: 'protocol' },
     '#include <HTTPClient.h>': { name: 'HTTP Client', category: 'backend', type: 'http-client' },
     '#include <ESP': { name: 'ESP32/ESP8266', category: 'backend', type: 'microcontroller' },
-    '#include <NeoPixel': { name: 'NeoPixel', category: 'utility', type: 'led-library' },
-    '#include <Servo.h>': { name: 'Servo', category: 'utility', type: 'library' },
-    '#include <LiquidCrystal': { name: 'LiquidCrystal', category: 'utility', type: 'display' },
-    '#include <DHT': { name: 'DHT Sensor Library', category: 'utility', type: 'sensor-library' },
+    '#include <NeoPixel': { name: 'NeoPixel', category: 'backend', type: 'led-library' },
+    '#include <Servo.h>': { name: 'Servo', category: 'backend', type: 'library' },
+    '#include <LiquidCrystal': { name: 'LiquidCrystal', category: 'backend', type: 'display' },
+    '#include <DHT': { name: 'DHT Sensor Library', category: 'backend', type: 'sensor-library' },
   };
 
   for (const [pattern, tech] of Object.entries(cppPatterns)) {

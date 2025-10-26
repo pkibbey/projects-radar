@@ -34,13 +34,16 @@ const buildPlaceholderBundle = (entry: GitHubUserRepo): RepositoryBundle => ({
     openIssues: 0,
     defaultBranch: "main",
     branch: "main",
-    pushedAt: new Date(0).toISOString(),
+    pushedAt: new Date().toISOString(),
     htmlUrl: `https://github.com/${entry.owner}/${entry.repo}`,
     primaryLanguage: null,
     status: "stale",
     topics: [],
     hasDiscussions: false,
     watchers: 0,
+    isPrivate: false,
+    isFork: false,
+    archived: false,
     license: null,
   },
   documents: [],
@@ -170,7 +173,7 @@ async function DashboardContent({ sortMode, sortOrder, dataFilter }: DashboardCo
           No repositories match this filter.
         </p>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4">
           {sortedProjects.map((project) => (
             <RepoCard
               key={`${project.bundle.meta.owner}/${project.bundle.meta.name}`}

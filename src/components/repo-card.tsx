@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import { Lightbulb, ListChecks } from "lucide-react";
+import { Lightbulb } from "lucide-react";
 import { useState } from "react";
 import type { RepositoryBundle } from "@/lib/github";
 import type { RepoAnalysis } from "@/lib/ai";
@@ -11,7 +11,6 @@ import { Badge } from "@/components/ui/badge";
 import { RepoStatusBadge } from "@/components/repo-status-badge";
 import { RepoActionsList } from "@/components/repo-actions-list";
 import { RepoIntelligenceRefreshButton } from "@/components/repo-intelligence-refresh-button";
-import { CompletenessIndicator } from "@/components/completeness-indicator";
 import { LanguageIcon } from "@/components/language-icon";
 import { EditableText } from "@/components/editable-text";
 import { TechStackDisplay } from "@/components/tech-stack-display";
@@ -39,12 +38,7 @@ export const RepoCard = ({
     ? formatDistanceToNow(new Date(lastGeneratedAt), { addSuffix: true })
     : null;
 
-  const showInsights = hasData;
   const showActions = hasData;
-  const insightLimit = undefined;
-  const insights = showInsights
-    ? (currentAnalysis?.insights ?? []).slice(0, insightLimit)
-    : [];
   const showTopics = hasData && meta.topics.length > 0;
   const showPackages = hasData && (currentAnalysis?.packages?.length ?? 0) > 0;
   const packages = showPackages ? (currentAnalysis?.packages ?? []) : [];
@@ -106,12 +100,11 @@ export const RepoCard = ({
                 />
               </div>
             )}
-            <RepoStatusBadge status={meta.status} />
-            {hasData && typeof meta.completenessScore === "number" && (
-              <CompletenessIndicator
-                score={meta.completenessScore}
-                size="sm"
-              />
+            {hasData && currentAnalysis?.techStack && (
+                <TechStackDisplay 
+                  techStack={currentAnalysis.techStack}
+                  showEmptyCategories={false}
+                />
             )}
           </div>
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
@@ -150,12 +143,11 @@ export const RepoCard = ({
 
       {(showPackages ||
         (summaryText) ||
-        insights.length > 0 ||
         showActions ||
         (hasData && currentAnalysis?.techStack)
       ) && (
         <>
-          <section className="grid gap-4">
+          <section>
             <div className="space-y-4">
               {showPackages && (
                 <div>
@@ -172,21 +164,9 @@ export const RepoCard = ({
                 </div>
               )}
 
-              {hasData && currentAnalysis?.techStack && (
-                <div>
-                  <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Technology Stack
-                  </h3>
-                  <TechStackDisplay 
-                    techStack={currentAnalysis.techStack}
-                    showEmptyCategories={false}
-                  />
-                </div>
-              )}
-
               {summaryText && <div>
                 <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
-                  <Lightbulb className="h-4 w-4" /> AI Summary
+                  <Lightbulb className="h-4 w-4" /> Summary
                 </h3>
                 <EditableText
                   value={summaryText}
@@ -196,31 +176,12 @@ export const RepoCard = ({
                 />
               </div>}
             </div>
-
-            {insights.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
-                  <ListChecks className="h-4 w-4" /> Key insights
-                </h3>
-                <ul className="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
-                  {insights.map((insight) => (
-                    <li
-                      key={insight.title}
-                      className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800"
-                    >
-                      <p className="font-medium">{insight.title}</p>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </section>
 
           {showActions && (
             <section className="w-full">
               <RepoActionsList 
                 actions={currentAnalysis?.actions ?? []} 
-                layout="columns"
               />
             </section>
           )}

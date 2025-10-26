@@ -27,11 +27,7 @@ export async function GET() {
       const categories: TechCategory[] = [
         "frontend",
         "backend",
-        "database",
-        "devops",
         "testing",
-        "build",
-        "utility",
       ];
 
       for (const category of categories) {
