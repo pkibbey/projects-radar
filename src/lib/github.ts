@@ -35,6 +35,8 @@ export type RepositoryBundle = {
     isPrivate: boolean;
     isFork: boolean;
     archived: boolean;
+    ownerUsername?: string;
+    isOwnedByUser?: boolean;
   };
   documents: RepoDocument[];
 };

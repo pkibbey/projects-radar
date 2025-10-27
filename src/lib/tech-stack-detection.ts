@@ -45,7 +45,6 @@ const TECH_MAPPING: Record<string, TechStack> = {
   sass: { name: 'Sass', category: 'frontend', type: 'styling' },
   scss: { name: 'Sass', category: 'frontend', type: 'styling' },
   'less': { name: 'Less', category: 'frontend', type: 'styling' },
-  postcss: { name: 'PostCSS', category: 'frontend', type: 'styling' },
   
   // Component Libraries
   '@mui/material': { name: 'Material-UI', category: 'frontend', type: 'component-library' },

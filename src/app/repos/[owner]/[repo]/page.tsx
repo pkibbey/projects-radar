@@ -3,8 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ArrowLeft, ExternalLink, Lightbulb, Clock } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { fetchUserRepositories } from "@/lib/github-user-repos";
-import { getGitHubOwner, getGitHubToken } from "@/lib/env";
+import { getGitHubToken } from "@/lib/env";
 import { fetchRepositoryBundle } from "@/lib/github";
 import {
   buildFallback,
@@ -16,18 +15,6 @@ import { RepoIntelligenceRefreshButton } from "@/components/repo-intelligence-re
 import db from "@/lib/db";
 
 export const revalidate = 60;
-
-export const generateStaticParams = async () => {
-  try {
-    const owner = getGitHubOwner();
-    const token = getGitHubToken();
-    const repos = await fetchUserRepositories(owner, token);
-    return repos.map((repo) => ({ owner: repo.owner, repo: repo.repo }));
-  } catch (error) {
-    console.error("Failed to generate static params:", error);
-    return [];
-  }
-};
 
 type RepoPageProps = {
   params: Promise<{

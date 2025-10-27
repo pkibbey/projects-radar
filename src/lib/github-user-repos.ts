@@ -8,6 +8,9 @@ export type GitHubUserRepo = {
   owner: string;
   repo: string;
   displayName: string;
+  isFork: boolean;
+  ownerUsername: string;
+  isOwnedByUser: boolean; // Always true since we only fetch owned repos
 };
 
 type GitHubHeaders = {
@@ -29,12 +32,19 @@ const createHeaders = (token?: string): GitHubHeaders => {
   return headers;
 };
 
+// In-memory cache with timestamp to prevent excessive API calls
+let cachedRepos: GitHubUserRepo[] | null = null;
+let cacheTimestamp: number = 0;
+const CACHE_DURATION_MS = 3600000; // 1 hour - GitHub rate limit: 5000 requests/hour
+
 /**
- * Fetches all repositories for the authenticated user
+ * Fetches all repositories owned by the authenticated GitHub user
  * Handles pagination to get all repos (max 100 per page)
  * 
- * Uses the authenticated /user/repos endpoint when a token is provided,
- * which includes all repositories the user has access to (owned, collaborated, organization repos)
+ * Only returns repositories that are:
+ * - Owned by the authenticated user (not forks, not collaborative)
+ * 
+ * Implements aggressive caching (1 hour) to prevent hitting GitHub's rate limit
  */
 export const fetchUserRepositories = async (
   _owner: string,
@@ -44,7 +54,27 @@ export const fetchUserRepositories = async (
     throw new Error("GITHUB_TOKEN is required to fetch repositories");
   }
 
+  // Return cached data if still valid
+  const now = Date.now();
+  if (cachedRepos !== null && now - cacheTimestamp < CACHE_DURATION_MS) {
+    const cached = cachedRepos as GitHubUserRepo[];
+    console.log(`Returning cached repositories (${cached.length} repos, cached for ${Math.round((now - cacheTimestamp) / 1000)}s)`);
+    return cached;
+  }
+
   const headers = createHeaders(token);
+  
+  // First, fetch the authenticated user's login
+  console.log("Fetching authenticated user information...");
+  const userResponse = await fetch(`${GITHUB_API}/user`, { headers });
+  if (!userResponse.ok) {
+    throw new Error(`Failed to fetch user info: ${userResponse.status}`);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const user = await userResponse.json() as any;
+  const currentUserLogin = user.login;
+  console.log(`Authenticated user: ${currentUserLogin}`);
+
   const repos: GitHubUserRepo[] = [];
   let page = 1;
   let hasMore = true;
@@ -52,17 +82,27 @@ export const fetchUserRepositories = async (
   while (hasMore) {
     console.log(`Fetching page ${page} of repositories for authenticated user...`);
     
+    // Use type=owner to only get repos owned by the user (excludes forks, collaborative repos)
     const response = await fetch(
-      `${GITHUB_API}/user/repos?per_page=100&page=${page}&sort=updated&direction=desc&type=all`,
+      `${GITHUB_API}/user/repos?per_page=100&page=${page}&sort=updated&direction=desc&type=owner`,
       {
         headers,
-        next: { revalidate: 300 }, // Revalidate every 5 minutes
+        next: { revalidate: 3600 }, // Revalidate every 1 hour - aligns with cache duration
       }
     );
 
     if (!response.ok) {
+      // Log detailed error information for debugging
+      const errorBody = await response.text();
+      console.error('GitHub API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers),
+        body: errorBody,
+      });
+      
       throw new Error(
-        `Failed to fetch repositories: ${response.status} ${response.statusText}`
+        `Failed to fetch repositories: ${response.status} ${response.statusText}. Response: ${errorBody}`
       );
     }
 
@@ -76,10 +116,14 @@ export const fetchUserRepositories = async (
     // Transform GitHub API response to our format
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     data.forEach((repo: any) => {
+      const repoOwnerLogin = repo.owner.login;
       repos.push({
-        owner: repo.owner.login,
+        owner: repoOwnerLogin,
         repo: repo.name,
         displayName: repo.name,
+        isFork: repo.fork,
+        ownerUsername: repoOwnerLogin,
+        isOwnedByUser: true, // All repos from type=owner are owned by the user
       });
     });
 
@@ -89,5 +133,10 @@ export const fetchUserRepositories = async (
   }
 
   console.log(`Total repositories fetched: ${repos.length}`);
+  
+  // Cache the results
+  cachedRepos = repos;
+  cacheTimestamp = Date.now();
+  
   return repos;
 };

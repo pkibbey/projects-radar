@@ -2,7 +2,6 @@
 
 import { Badge } from "@/components/ui/badge";
 import { 
-  getCategoryLabel, 
   getCategoryColor,
   type TechCategory,
   type TechStack 
@@ -11,12 +10,10 @@ import type { TechStackInfo } from "@/lib/tech-stack-detection";
 
 type TechStackDisplayProps = {
   techStack: TechStackInfo;
-  showEmptyCategories?: boolean;
 };
 
 export const TechStackDisplay = ({
   techStack,
-  showEmptyCategories = false,
 }: TechStackDisplayProps) => {
   const categories: TechCategory[] = [
     "frontend",
@@ -36,22 +33,15 @@ export const TechStackDisplay = ({
   );
 
   return (
-    <div className="flex gap-2">
+    <div className="flex flex-wrap gap-2">
       {categories.map((category) => {
         const items = techStack[category] || [];
 
-        if (items.length === 0 && !showEmptyCategories) {
+        if (items.length === 0) {
           return null;
         }
 
-        return (
-          <div className="flex flex-wrap gap-2" key={category}>
-            {items.map(renderTechItem)}
-            {items.length === 0 && (
-              <span className="text-xs text-slate-400">None detected</span>
-            )}
-          </div>
-        );
+        return items.map(renderTechItem);
       })}
     </div>
   );

@@ -1,8 +1,7 @@
 import { NextRequest } from "next/server";
-import { fetchRepositoryBundle } from "@/lib/github";
-import { generateRepoAnalysis } from "@/lib/ai";
 import { getGitHubToken } from "@/lib/env";
 import db from "@/lib/db";
+import { inngest } from "@/lib/inngest";
 
 export async function POST(
   _request: NextRequest,
@@ -19,19 +18,29 @@ export async function POST(
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const entry = { owner, repo } as any;
-    const bundle = await fetchRepositoryBundle(entry, token);
-    const analysis = await generateRepoAnalysis(bundle);
-    const record = await db.upsertRepoData(owner, repo, { bundle, analysis });
-    
-    return new Response(JSON.stringify({ ok: true, data: record }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
+    // Queue the refresh with Inngest
+    await inngest.send({
+      name: "repo/refresh-intelligence",
+      data: {
+        owner,
+        repo,
+        token,
+      },
     });
+
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        message: "Refreshing repository intelligence in background...",
+      }),
+      {
+        status: 202,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   } catch (error) {
     console.error(
-      `Failed to regenerate intelligence for ${owner}/${repo}.`,
+      `Failed to queue intelligence refresh for ${owner}/${repo}.`,
       error,
     );
     const message = error instanceof Error ? error.message : "Unknown error";

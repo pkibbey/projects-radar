@@ -2,18 +2,20 @@
 
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import { Lightbulb } from "lucide-react";
 import { useState } from "react";
 import type { RepositoryBundle } from "@/lib/github";
 import type { RepoAnalysis } from "@/lib/ai";
+import type { RepoStatusRecord } from "@/lib/db";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { RepoStatusBadge } from "@/components/repo-status-badge";
-import { RepoActionsList } from "@/components/repo-actions-list";
-import { RepoIntelligenceRefreshButton } from "@/components/repo-intelligence-refresh-button";
+import { HideRepoButton } from "@/components/hide-repo-button";
 import { LanguageIcon } from "@/components/language-icon";
 import { EditableText } from "@/components/editable-text";
 import { TechStackDisplay } from "@/components/tech-stack-display";
+import { OwnershipBadge } from "@/components/ownership-badge";
+import { InfoIcon } from "lucide-react";
+import { ExternalLinkButton } from "./external-link-button";
+import { Button } from "./ui/button";
 
 type RepoCardProps = {
   bundle: RepositoryBundle;
@@ -21,6 +23,7 @@ type RepoCardProps = {
   hasData: boolean;
   lastGeneratedAt?: string;
   id?: string;
+  processingStatus?: RepoStatusRecord;
 };
 
 export const RepoCard = ({
@@ -29,10 +32,12 @@ export const RepoCard = ({
   hasData,
   lastGeneratedAt,
   id,
+  processingStatus,
 }: RepoCardProps) => {
   const { meta } = bundle;
   const [currentSummary, setCurrentSummary] = useState(analysis?.summary ?? "");
-  const [currentAnalysis, setCurrentAnalysis] = useState(analysis);
+  const [currentAnalysis] = useState(analysis);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const updatedAtText = lastGeneratedAt
     ? formatDistanceToNow(new Date(lastGeneratedAt), { addSuffix: true })
@@ -43,8 +48,7 @@ export const RepoCard = ({
   const showPackages = hasData && (currentAnalysis?.packages?.length ?? 0) > 0;
   const packages = showPackages ? (currentAnalysis?.packages ?? []) : [];
 
-  const cardSpacing = "gap-6 p-6";
-  const refreshButtonSize = "md";
+  const cardSpacing = "gap-1 p-3";
   const descriptionTone = "text-sm";
 
   const hasLanguage = hasData && meta.primaryLanguage;
@@ -70,23 +74,39 @@ export const RepoCard = ({
     setCurrentSummary(newSummary);
   };
 
-  const handleRefreshSuccess = (data: Record<string, unknown>) => {
-    const analysis = data?.analysis as RepoAnalysis | undefined;
-    if (analysis) {
-      setCurrentAnalysis(analysis);
-      setCurrentSummary(analysis.summary ?? "");
-    }
-  };
-
   return (
     <article
       id={id}
       className={cn(
-        "flex flex-col rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900",
+        "relative flex flex-col rounded border border-slate-200 bg-white shadow-sm transition hover:shadow-sm dark:border-slate-800 dark:bg-slate-900",
         cardSpacing,
         "scroll-mt-42",
       )}
     >
+      <div className="absolute -right-3 -top-3 z-10 flex gap-2 items-center">
+        {updatedAtText && (
+          <p className="text-xs text-slate-400 dark:text-slate-500 bg-slate-50 px-3 leading-7 rounded-xl border">
+            Updated {updatedAtText}
+            {currentAnalysis?.analysisDurationMs && (
+              <>
+                {" • "}
+                Analyzed in {(currentAnalysis.analysisDurationMs / 1000).toFixed(1)}s
+              </>
+            )}
+          </p>
+        )}
+        <ExternalLinkButton htmlUrl={meta.htmlUrl} />
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => setIsExpanded(!isExpanded)}
+          title={isExpanded ? "Hide info" : "Show info"}
+          className="h-7 w-7 rounded-full bg-slate-100/80 text-slate-500 hover:bg-orange-200 hover:text-orange-700 dark:bg-slate-800/80 dark:hover:bg-orange-700 dark:hover:text-orange-200 cursor-pointer border"
+        >
+          <InfoIcon className="h-4 w-4" />
+        </Button>
+        <HideRepoButton owner={meta.owner} repo={meta.name} />
+      </div>
       <header
         className="flex flex-wrap items-start justify-between gap-3"
       >
@@ -103,7 +123,6 @@ export const RepoCard = ({
             {hasData && currentAnalysis?.techStack && (
                 <TechStackDisplay 
                   techStack={currentAnalysis.techStack}
-                  showEmptyCategories={false}
                 />
             )}
           </div>
@@ -123,20 +142,11 @@ export const RepoCard = ({
               : "Generate data to pull the latest repository description and metadata from GitHub."}
           </p>
         </div>
-        <div className="flex gap-2">          
-          <RepoIntelligenceRefreshButton
-            owner={meta.owner}
-            repo={meta.name}
-            size={refreshButtonSize}
-            idleLabel={hasData ? "Refresh" : "Generate"}
-            loadingLabel={hasData ? "Refreshing…" : "Generating…"}
-            successMessage={
-              hasData
-                ? "Latest insights loaded."
-                : ""
-            }
-            useDataEndpoint={true}
-            onSuccess={handleRefreshSuccess}
+        <div className="flex flex-col gap-2">
+          <OwnershipBadge 
+            isFork={meta.isFork} 
+            isOwnedByUser={meta.isOwnedByUser ?? false}
+            ownerUsername={meta.ownerUsername}
           />
         </div>
       </header>
@@ -164,27 +174,16 @@ export const RepoCard = ({
                 </div>
               )}
 
-              {summaryText && <div>
-                <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
-                  <Lightbulb className="h-4 w-4" /> Summary
-                </h3>
+              {summaryText && 
                 <EditableText
                   value={summaryText}
                   onSave={handleSaveSummary}
                   className="leading-relaxed text-slate-700 dark:text-slate-200 mt-2 text-sm"
                   placeholder="No summary available. Double-click to add one."
                 />
-              </div>}
+              }
             </div>
           </section>
-
-          {showActions && (
-            <section className="w-full">
-              <RepoActionsList 
-                actions={currentAnalysis?.actions ?? []} 
-              />
-            </section>
-          )}
         </>
       )}
 
@@ -196,18 +195,23 @@ export const RepoCard = ({
             </Badge>
           ))}
         </footer>
-      )}
+      )}      
 
-      {updatedAtText && (
-        <p className="text-right text-xs text-slate-400 dark:text-slate-500">
-          Updated {updatedAtText}
-          {currentAnalysis?.analysisDurationMs && (
-            <>
-              {" • "}
-              Analyzed in {(currentAnalysis.analysisDurationMs / 1000).toFixed(1)}s
-            </>
-          )}
-        </p>
+      {isExpanded && (
+        <div className="mt-4 overflow-auto rounded border border-slate-300 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950">
+          <pre className="text-xs text-slate-600 dark:text-slate-300 max-h-96 break-words whitespace-pre-wrap">
+            {JSON.stringify(
+              {
+                meta,
+                analysis: currentAnalysis,
+                hasData,
+                processingStatus,
+              },
+              null,
+              2
+            )}
+          </pre>
+        </div>
       )}
     </article>
   );

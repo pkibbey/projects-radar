@@ -19,7 +19,6 @@ type RepoIntelligenceRefreshButtonProps = {
 export const RepoIntelligenceRefreshButton = ({
   owner,
   repo,
-  size = "md",
   useDataEndpoint = true,
   idleLabel = "Regenerate AI",
   loadingLabel = "Processing…",
@@ -75,10 +74,10 @@ export const RepoIntelligenceRefreshButton = ({
         type="button"
         onClick={handleClick}
         variant="outline"
-        size={size === "sm" ? "sm" : "default"}
+        size="sm"
         disabled={status === "loading"}
         aria-label="Regenerate project intelligence"
-        className="rounded-full cursor-pointer"
+        className="cursor-pointer"
       >
         {status === "loading" ? (
           <Loader2 className="h-4 w-4 animate-spin" />

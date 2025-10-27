@@ -248,6 +248,73 @@ ${prepareContext(bundle)}`;
   }
 };
 
+/**
+ * Generate a very short description of a repository for display
+ */
+export const generateShortDescription = async (
+  bundle: RepositoryBundle,
+): Promise<string> => {
+  const model = getAIModel();
+
+  const client = new OpenAI({
+    apiKey: "lm-studio",
+    baseURL: getLmStudioUrl(),
+  });
+
+  if (providerHealth.status === "failed") {
+    return bundle.meta.description || "No description available.";
+  }
+
+  try {
+    const input = `You are an expert at creating concise project descriptions. Analyze this repository and generate a very short description (1-2 sentences maximum, under 120 characters).
+
+Examples of good descriptions:
+- A React app based controller for the Adeept RaspTank
+- A simple React & Redux boilerplate with a Counter component
+- A tracklist exporter for Ableton Live
+- An AI Document Analyzer
+
+Respond with ONLY the short description text, no JSON or other formatting.
+
+Repository context:
+${prepareContext(bundle)}`;
+
+    const response = await client.responses.create({
+      model,
+      input,
+      max_output_tokens: 100,
+    });
+
+    providerHealth = { status: "ready" };
+    loggedProviderFailure = false;
+
+    const text = response.output_text?.trim();
+    if (!text) {
+      return bundle.meta.description || "No description available.";
+    }
+
+    return text;
+  } catch (error) {
+    if (isConnectionError(error)) {
+      providerHealth = {
+        status: "failed",
+        message: LM_STUDIO_FAILURE_MESSAGE,
+      };
+      if (!loggedProviderFailure) {
+        console.error("generateShortDescription connection error", error);
+        loggedProviderFailure = true;
+      }
+      return bundle.meta.description || "No description available.";
+    }
+
+    console.error("generateShortDescription error", error);
+    if (error instanceof GitHubError) {
+      return error.message;
+    }
+    return bundle.meta.description || "No description available.";
+  }
+};
+
 export type PackageJsonEnhancement = {
   description: string;
   keywords: string[];

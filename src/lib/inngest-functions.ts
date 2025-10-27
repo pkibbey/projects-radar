@@ -1,0 +1,409 @@
+import { inngest } from "@/lib/inngest";
+import db from "@/lib/db";
+import { fetchRepositoryBundle } from "@/lib/github";
+import { generateRepoAnalysis, generateShortDescription } from "@/lib/ai";
+import { fetchAndExtractTechStack } from "@/lib/tech-stack-fetcher";
+import { fetchUserRepositories } from "@/lib/github-user-repos";
+import { cloneRepoForAnalysis, cleanupRepo } from "@/lib/repo-cloner";
+import { analyzeCopilotWithContext, generateQuickCopilotAnalysis } from "@/lib/copilot-analyzer";
+
+/**
+ * Process a single repository
+ */
+export const processSingleRepository = inngest.createFunction(
+  { id: "process-single-repository" },
+  { event: "repo/process-single" },
+  async ({ event, logger }) => {
+    const { owner, repo, token } = event.data;
+    const key = `${owner.toLowerCase()}/${repo.toLowerCase()}`;
+
+    logger.info(`Processing repository: ${owner}/${repo}`);
+
+    try {
+      // Mark as processing
+      await db.setRepoStatus(owner, repo, "processing");
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const bundleEntry = { owner, repo } as any;
+      const bundle = await fetchRepositoryBundle(bundleEntry, token);
+      const analysis = await generateRepoAnalysis(bundle);
+
+      // Fetch and extract tech stack
+      const techStack = await fetchAndExtractTechStack(
+        owner,
+        repo,
+        undefined,
+        token
+      );
+
+      if (techStack) {
+        analysis.techStack = techStack;
+      }
+
+      const analysisWithDuration = {
+        ...analysis,
+        analysisDurationMs: 0,
+      };
+
+      await db.upsertRepoData(owner, repo, {
+        bundle,
+        analysis: analysisWithDuration,
+      });
+
+      // Mark as completed
+      await db.setRepoStatus(owner, repo, "completed");
+
+      logger.info(`Successfully processed ${owner}/${repo}`);
+      return { success: true, key };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
+      // Check if it's a 403 Forbidden error
+      if (errorMessage.includes("403")) {
+        logger.warn(
+          `Skipping ${owner}/${repo}: Access denied (private repository or insufficient permissions)`
+        );
+        // Mark as completed with skipped status
+        await db.setRepoStatus(owner, repo, "completed");
+        return { success: true, key, skipped: true, reason: "Access denied" };
+      }
+
+      // Check if it's a rate limit error
+      if (errorMessage.includes("rate limit")) {
+        logger.error(`Rate limit hit for ${owner}/${repo}`);
+        await db.setRepoStatus(owner, repo, "failed", errorMessage);
+        throw error; // Re-throw to trigger Inngest retry
+      }
+
+      logger.error(`Failed to process ${owner}/${repo}:`, error);
+      await db.setRepoStatus(owner, repo, "failed", errorMessage);
+      throw error; // Re-throw to trigger Inngest retry
+    }
+  }
+);
+
+/**
+ * Process all remaining repositories for a user
+ */
+export const processBatchRepositories = inngest.createFunction(
+  { id: "process-batch-repositories" },
+  { event: "repo/process-batch" },
+  async ({ event, logger }) => {
+    const { owner, token, forkFilter = "all" } = event.data;
+
+    logger.info(`Starting batch processing for ${owner} (forkFilter: ${forkFilter})`);
+
+    try {
+      let repos = await fetchUserRepositories(owner, token);
+      
+      // Apply fork filter
+      if (forkFilter === "with-forks") {
+        repos = repos.filter((repo) => repo.isFork);
+      } else if (forkFilter === "without-forks") {
+        repos = repos.filter((repo) => !repo.isFork);
+      }
+
+      logger.info(`Found ${repos.length} repositories to process`);
+
+      if (repos.length === 0) {
+        logger.info("No repositories to process");
+        return { queued: 0, failed: 0 };
+      }
+
+      // Queue individual repository processing tasks for all filtered repos
+      const results = await Promise.allSettled(
+        repos.map(async (entry) => {
+          return inngest.send({
+            name: "repo/process-single",
+            data: {
+              owner: entry.owner,
+              repo: entry.repo,
+              token,
+            },
+          });
+        })
+      );
+
+      const summary = {
+        queued: results.filter((r) => r.status === "fulfilled").length,
+        failed: results.filter((r) => r.status === "rejected").length,
+      };
+
+      logger.info(`Batch processing initiated`, summary);
+      return summary;
+    } catch (error) {
+      logger.error("Failed to start batch processing:", error);
+      throw error;
+    }
+  }
+);
+
+/**
+ * Refresh repository intelligence (re-analyze)
+ */
+export const refreshRepositoryIntelligence = inngest.createFunction(
+  { id: "refresh-repository-intelligence" },
+  { event: "repo/refresh-intelligence" },
+  async ({ event, logger }) => {
+    const { owner, repo, token } = event.data;
+
+    logger.info(`Refreshing intelligence for ${owner}/${repo}`);
+
+    try {
+      // Mark as processing
+      await db.setRepoStatus(owner, repo, "processing");
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const bundleEntry = { owner, repo } as any;
+      const bundle = await fetchRepositoryBundle(bundleEntry, token);
+      const analysis = await generateRepoAnalysis(bundle);
+
+      // Fetch and extract tech stack
+      const techStack = await fetchAndExtractTechStack(
+        owner,
+        repo,
+        undefined,
+        token
+      );
+
+      if (techStack) {
+        analysis.techStack = techStack;
+      }
+
+      const analysisWithDuration = {
+        ...analysis,
+        analysisDurationMs: 0,
+      };
+
+      await db.upsertRepoData(owner, repo, {
+        bundle,
+        analysis: analysisWithDuration,
+      });
+
+      // Mark as completed
+      await db.setRepoStatus(owner, repo, "completed");
+
+      logger.info(`Successfully refreshed intelligence for ${owner}/${repo}`);
+      return { success: true, owner, repo };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      await db.setRepoStatus(owner, repo, "failed", errorMessage);
+      logger.error(`Failed to refresh intelligence for ${owner}/${repo}:`, error);
+      throw error;
+    }
+  }
+);
+
+/**
+ * Sync repositories from GitHub and initialize status tracking
+ */
+export const syncRepositoriesFromGitHub = inngest.createFunction(
+  { id: "sync-repositories-from-github" },
+  { event: "repos/sync" },
+  async ({ event, logger }) => {
+    const { owner, token } = event.data;
+
+    logger.info(`Syncing repositories for ${owner}`);
+
+    try {
+      // Fetch repositories from GitHub
+      const repos = await fetchUserRepositories(owner, token);
+      console.log('repos: ', repos);
+
+      // Save the fetched repositories list to the database
+      await db.saveFetchedRepositories(repos);
+
+      logger.info(`Successfully synced ${repos.length} repositories for ${owner}`);
+      return { success: true, count: repos.length };
+    } catch (error) {
+      logger.error(`Failed to sync repositories for ${owner}:`, error);
+      throw error;
+    }
+  }
+);
+
+/**
+ * Process repository data - fetch bundle, analyze, and store
+ */
+export const processRepositoryData = inngest.createFunction(
+  { id: "process-repository-data" },
+  { event: "repo/process-data" },
+  async ({ event, logger }) => {
+    const { owner, repo, token, useCopilot = false, useLmStudio = true } = event.data;
+
+    logger.info(`Processing repository data for ${owner}/${repo}`);
+
+    let repoPath: string | null = null;
+
+    try {
+      // Create a temporary entry object for fetchRepositoryBundle
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const entry = { owner, repo } as any;
+      const bundle = await fetchRepositoryBundle(entry, token);
+
+      let analysis;
+      
+      if (!useCopilot || useLmStudio) {
+        // Use original LM Studio approach (no cloning needed) - FAST!
+        logger.info(`Analyzing ${owner}/${repo} with LM Studio...`);
+        analysis = await generateRepoAnalysis(bundle);
+      } else {
+        // Clone repository and analyze with GitHub Copilot CLI
+        logger.info(`Cloning repository ${owner}/${repo} for Copilot analysis...`);
+        repoPath = await cloneRepoForAnalysis(owner, repo, token);
+        
+        // Try quick analysis first (faster, simpler)
+        logger.info(`Analyzing ${owner}/${repo} with GitHub Copilot (quick mode)...`);
+        
+        try {
+          analysis = await generateQuickCopilotAnalysis(repoPath, owner, repo);
+        } catch (quickError) {
+          logger.warn('Quick Copilot analysis failed, trying full analysis...', quickError);
+          // Fall back to full analysis if quick fails
+          analysis = await analyzeCopilotWithContext(repoPath, owner, repo);
+        }
+      }
+
+      // Fetch and extract tech stack from package.json
+      logger.info(`Extracting tech stack for ${owner}/${repo}...`);
+      const techStack = await fetchAndExtractTechStack(
+        owner,
+        repo,
+        undefined,
+        token
+      );
+
+      if (techStack) {
+        analysis.techStack = techStack;
+      }
+
+      // Add duration placeholder
+      analysis = { ...analysis, analysisDurationMs: 0 };
+
+      await db.upsertRepoData(owner, repo, { bundle, analysis });
+
+      logger.info(`Successfully processed repository data for ${owner}/${repo}`);
+      return { success: true, owner, repo };
+    } catch (error) {
+      logger.error(`Failed to process repository data for ${owner}/${repo}:`, error);
+      throw error;
+    } finally {
+      // Always cleanup the cloned repository
+      if (repoPath) {
+        await cleanupRepo(repoPath);
+      }
+    }
+  }
+);
+
+/**
+ * Generate a short description for a single repository
+ */
+export const generateSingleShortDescription = inngest.createFunction(
+  { id: "generate-single-short-description" },
+  { event: "repo/generate-short-description" },
+  async ({ event, logger }) => {
+    const { owner, repo, token } = event.data;
+
+    logger.info(`Generating short description for ${owner}/${repo}`);
+
+    try {
+      // Mark as processing
+      await db.setRepoStatus(owner, repo, "processing");
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const bundleEntry = { owner, repo } as any;
+      const bundle = await fetchRepositoryBundle(bundleEntry, token);
+      const shortDescription = await generateShortDescription(bundle);
+
+      // Update the description in the database
+      await db.updateRepoDescription(owner, repo, shortDescription);
+
+      // Mark as completed
+      await db.setRepoStatus(owner, repo, "completed");
+
+      logger.info(`Successfully generated short description for ${owner}/${repo}`, shortDescription);
+      return { success: true, key: `${owner}/${repo}`, description: shortDescription };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
+      // Check if it's a 403 Forbidden error
+      if (errorMessage.includes("403")) {
+        logger.warn(
+          `Skipping ${owner}/${repo}: Access denied (private repository or insufficient permissions)`
+        );
+        // Mark as completed with skipped status
+        await db.setRepoStatus(owner, repo, "completed");
+        return { success: true, key: `${owner}/${repo}`, skipped: true, reason: "Access denied" };
+      }
+
+      // Check if it's a rate limit error
+      if (errorMessage.includes("rate limit")) {
+        logger.error(`Rate limit hit for ${owner}/${repo}`);
+        await db.setRepoStatus(owner, repo, "failed", errorMessage);
+        throw error; // Re-throw to trigger Inngest retry
+      }
+
+      logger.error(`Failed to generate short description for ${owner}/${repo}:`, error);
+      await db.setRepoStatus(owner, repo, "failed", errorMessage);
+      throw error; // Re-throw to trigger Inngest retry
+    }
+  }
+);
+
+/**
+ * Process all repositories to generate short descriptions
+ */
+export const generateBatchShortDescriptions = inngest.createFunction(
+  { id: "generate-batch-short-descriptions" },
+  { event: "repo/generate-batch-short-descriptions" },
+  async ({ event, logger }) => {
+    const { token, forkFilter = "all" } = event.data;
+
+    logger.info(`Starting batch short description generation (forkFilter: ${forkFilter})`);
+
+    try {
+      // Fetch repositories from database
+      let repos = await db.getFetchedRepositories();
+      
+      // Apply fork filter
+      if (forkFilter === "with-forks") {
+        repos = repos.filter((repo) => repo.isFork);
+      } else if (forkFilter === "without-forks") {
+        repos = repos.filter((repo) => !repo.isFork);
+      }
+
+      logger.info(`Found ${repos.length} repositories to process for short descriptions`);
+
+      if (repos.length === 0) {
+        logger.info("No repositories to process");
+        return { queued: 0, failed: 0 };
+      }
+
+      // Queue individual repository processing tasks for all filtered repos
+      const results = await Promise.allSettled(
+        repos.map(async (entry) => {
+          return inngest.send({
+            name: "repo/generate-short-description",
+            data: {
+              owner: entry.owner,
+              repo: entry.repo,
+              token,
+            },
+          });
+        })
+      );
+
+      const summary = {
+        queued: results.filter((r) => r.status === "fulfilled").length,
+        failed: results.filter((r) => r.status === "rejected").length,
+      };
+
+      logger.info(`Batch short description generation initiated`, summary);
+      return summary;
+    } catch (error) {
+      logger.error("Failed to start batch short description generation:", error);
+      throw error;
+    }
+  }
+);

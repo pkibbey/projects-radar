@@ -1,18 +1,24 @@
 import { Suspense } from "react";
-import { fetchUserRepositories, type GitHubUserRepo } from "@/lib/github-user-repos";
-import { getGitHubOwner, getGitHubToken } from "@/lib/env";
+import { type GitHubUserRepo } from "@/lib/github-user-repos";
+import { getGitHubOwner } from "@/lib/env";
 import db from "@/lib/db";
 import type { RepositoryBundle } from "@/lib/github";
 import type { RepoAnalysis } from "@/lib/ai";
+import type { RepoStatusRecord } from "@/lib/db";
 import { RepoCard } from "@/components/repo-card";
 import { SortSelector, type SortKey, type SortOrder } from "@/components/sort-selector";
-import { DataFilterSelector } from "@/components/data-filter-selector";
 import {
   DEFAULT_DATA_FILTER,
   isDataFilter,
   type DataFilter,
 } from "@/lib/data-filters";
+import { DEFAULT_FORK_FILTER, isForkFilter, type ForkFilter } from "@/lib/fork-filters";
 import { OrderSelector } from "@/components/order-selector";
+import { ForkFilterSelector } from "@/components/fork-filter-selector";
+import { BatchGenerateButton } from "@/components/batch-generate-button";
+import { RefreshRepositoriesButton } from "@/components/refresh-repositories-button";
+import { UnhideAllReposButton } from "@/components/unhide-all-repos-button";
+import { BatchGenerateShortDescriptionsButton } from "@/components/batch-generate-short-descriptions-button";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +28,7 @@ type ProjectRow = {
   analysis: RepoAnalysis | null;
   hasData: boolean;
   updatedAt?: string | null;
+  processingStatus?: RepoStatusRecord | null;
 };
 
 const buildPlaceholderBundle = (entry: GitHubUserRepo): RepositoryBundle => ({
@@ -42,9 +49,11 @@ const buildPlaceholderBundle = (entry: GitHubUserRepo): RepositoryBundle => ({
     hasDiscussions: false,
     watchers: 0,
     isPrivate: false,
-    isFork: false,
+    isFork: entry.isFork,
     archived: false,
     license: null,
+    ownerUsername: entry.ownerUsername,
+    isOwnedByUser: entry.isOwnedByUser,
   },
   documents: [],
 });
@@ -55,46 +64,71 @@ type DashboardContentProps = {
   sortMode: SortKey;
   sortOrder: SortOrder;
   dataFilter: DataFilter;
+  forkFilter: ForkFilter;
+  repos?: GitHubUserRepo[];
+  owner?: string;
 };
 
-async function DashboardContent({ sortMode, sortOrder, dataFilter }: DashboardContentProps) {
+async function DashboardContent({ sortMode, sortOrder, dataFilter, forkFilter, repos = [], owner = "" }: DashboardContentProps) {
   const records = await db.listRepoData();
   const recordMap = new Map(records.map((record) => [record.key, record]));
 
-  // Fetch all repositories for the configured GitHub owner
-  const owner = getGitHubOwner();
-  const token = getGitHubToken();
-  const repos = await fetchUserRepositories(owner, token);
+  // Fetch hidden repos
+  const hiddenRepos = await db.getHiddenRepos();
+  const hiddenReposSet = new Set(hiddenRepos);
 
-  const projects: ProjectRow[] = repos.map((entry) => {
-    const record = recordMap.get(keyForEntry(entry)) ?? null;
-    const bundle = record?.bundle ?? buildPlaceholderBundle(entry);
-    return {
-      entry,
-      bundle,
-      analysis: record?.analysis ?? null,
-      hasData: Boolean(record),
-      updatedAt: record?.updatedAt ?? null,
-    } satisfies ProjectRow;
-  });
+  const projects: ProjectRow[] = repos
+    .filter((entry) => !hiddenReposSet.has(keyForEntry(entry))) // Filter out hidden repos
+    .map((entry) => {
+      const record = recordMap.get(keyForEntry(entry)) ?? null;
+      const bundle = record?.bundle ?? buildPlaceholderBundle(entry);
+      return {
+        entry,
+        bundle,
+        analysis: record?.analysis ?? null,
+        hasData: Boolean(record),
+        updatedAt: record?.updatedAt ?? null,
+        processingStatus: null, // Will be fetched separately
+      } satisfies ProjectRow;
+    });
 
-  if (!projects.length) {
+  // Fetch processing status for all repos
+  const statusRecords = await db.getReposByStatuses(["pending", "processing", "completed", "failed"]);
+  const statusMap = new Map(statusRecords.map((record) => [record.key, record]));
+
+  // Update projects with their processing status
+  const projectsWithStatus = projects.map((project) => ({
+    ...project,
+    processingStatus: statusMap.get(keyForEntry(project.entry)) ?? null,
+  }));
+
+  if (!projectsWithStatus.length) {
     return (
       <div className="mx-auto max-w-2xl text-center text-sm text-slate-600 dark:text-slate-300">
         <p className="font-medium">
-          No repositories found. Set `GITHUB_OWNER` in your environment to get started.
+          No repositories loaded. Click "Load Repos" to fetch your repositories from GitHub.
         </p>
       </div>
     );
   }
 
-  const filteredProjects = projects.filter((project) => {
+  const filteredProjects = projectsWithStatus.filter((project) => {
+    // Apply data filter
     if (dataFilter === "with-data") {
-      return project.hasData;
+      if (!project.hasData) return false;
     }
     if (dataFilter === "without-data") {
-      return !project.hasData;
+      if (project.hasData) return false;
     }
+
+    // Apply fork filter
+    if (forkFilter === "with-forks") {
+      if (!project.entry.isFork) return false;
+    }
+    if (forkFilter === "without-forks") {
+      if (project.entry.isFork) return false;
+    }
+
     return true;
   });
 
@@ -128,7 +162,7 @@ async function DashboardContent({ sortMode, sortOrder, dataFilter }: DashboardCo
       if (primaryLanguage) {
         acc.languages.add(primaryLanguage);
       }
-      acc.cachedCount += 1;
+      acc.selectedCount += 1;
       return acc;
     },
     {
@@ -137,15 +171,20 @@ async function DashboardContent({ sortMode, sortOrder, dataFilter }: DashboardCo
       watchers: 0,
       latestPush: 0,
       languages: new Set<string>(),
-      cachedCount: 0,
+      selectedCount: 0,
     },
   );
 
   const topLanguages = Array.from(aggregateStats.languages).slice(0, 3);
   const extraLanguageCount = aggregateStats.languages.size - topLanguages.length;
-  const cachedCount = aggregateStats.cachedCount;
-  const totalProjects = projects.length;
+  const selectedCount = aggregateStats.selectedCount;
+  const totalProjects = projectsWithStatus.length;
   const showingAllProjects = dataFilter === "all";
+
+  // Count repos by processing status
+  const processingCount = projectsWithStatus.filter((p) => p.processingStatus?.status === "processing").length;
+  const queuedCount = projectsWithStatus.filter((p) => p.processingStatus?.status === "pending").length;
+  const failedCount = projectsWithStatus.filter((p) => p.processingStatus?.status === "failed").length;
 
   return (
     <div className="flex flex-col gap-6">
@@ -155,8 +194,11 @@ async function DashboardContent({ sortMode, sortOrder, dataFilter }: DashboardCo
             ? `${totalProjects} repositories from ${owner}`
             : `Showing ${filteredProjects.length} of ${totalProjects} repositories from ${owner}`}
         </span>
-        {cachedCount > 0 && <span>📦 {cachedCount} cached</span>}
-        {cachedCount > 0 && (
+        {selectedCount > 0 && <span>📦 {selectedCount} selected</span>}
+        {processingCount > 0 && <span>⚙️ {processingCount} analyzing</span>}
+        {queuedCount > 0 && <span>📋 {queuedCount} queued</span>}
+        {failedCount > 0 && <span>❌ {failedCount} failed</span>}
+        {selectedCount > 0 && (
           <>
             {topLanguages.length > 0 && (
               <span>
@@ -182,6 +224,7 @@ async function DashboardContent({ sortMode, sortOrder, dataFilter }: DashboardCo
               hasData={project.hasData}
               lastGeneratedAt={project.updatedAt ?? undefined}
               id={`${project.bundle.meta.owner}-${project.bundle.meta.name}`}
+              processingStatus={project.processingStatus ?? undefined}
             />
           ))}
         </div>
@@ -201,10 +244,19 @@ export default async function Home({ searchParams }: HomeProps) {
     ? resolvedParams.data[0]
     : resolvedParams.data;
   const rawOrder = Array.isArray(resolvedParams.order) ? resolvedParams.order[0] : resolvedParams.order;
+  const rawForkFilter = Array.isArray(resolvedParams.fork)
+    ? resolvedParams.fork[0]
+    : resolvedParams.fork;
   
   const sortMode: SortKey = rawSort === "updated" || rawSort === "completeness" ? rawSort : "name";
   const dataFilter = isDataFilter(rawDataFilter) ? rawDataFilter : DEFAULT_DATA_FILTER;
+  const forkFilter = isForkFilter(rawForkFilter) ? rawForkFilter : DEFAULT_FORK_FILTER;
   const sortOrder: SortOrder = rawOrder === "desc" ? "desc" : "asc";
+
+  const owner = getGitHubOwner();
+  
+  // Load the repository list that was fetched via the button
+  const fetchedRepos = await db.getFetchedRepositories();
 
   return (
     <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-10 px-6 py-12">
@@ -224,14 +276,20 @@ export default async function Home({ searchParams }: HomeProps) {
           )}
         </div>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-6">
-          <DataFilterSelector value={dataFilter} />
           <SortSelector value={sortMode} />
           <OrderSelector order={sortOrder} />
+          <ForkFilterSelector value={forkFilter} />
+        </div>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-6">
+          <RefreshRepositoriesButton />
+          <UnhideAllReposButton forkFilter={forkFilter} repos={fetchedRepos} />
+          <BatchGenerateButton dataFilter={dataFilter} forkFilter={forkFilter} repos={fetchedRepos} />
+          <BatchGenerateShortDescriptionsButton dataFilter={dataFilter} forkFilter={forkFilter} repos={fetchedRepos} />
         </div>
       </header>
 
       <Suspense fallback={<p className="text-sm text-slate-500">Loading repositories…</p>}>
-        <DashboardContent sortMode={sortMode} sortOrder={sortOrder} dataFilter={dataFilter} />
+        <DashboardContent sortMode={sortMode} sortOrder={sortOrder} dataFilter={dataFilter} forkFilter={forkFilter} repos={fetchedRepos} owner={owner} />
       </Suspense>
     </div>
   );
