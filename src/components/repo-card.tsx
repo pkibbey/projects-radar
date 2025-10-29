@@ -152,7 +152,7 @@ export const RepoCard = ({
       </header>
 
       {(showPackages ||
-        (summaryText) ||
+        (isExpanded && summaryText) ||
         showActions ||
         (hasData && currentAnalysis?.techStack)
       ) && (
@@ -174,7 +174,7 @@ export const RepoCard = ({
                 </div>
               )}
 
-              {summaryText && 
+              {isExpanded && summaryText && 
                 <EditableText
                   value={summaryText}
                   onSave={handleSaveSummary}

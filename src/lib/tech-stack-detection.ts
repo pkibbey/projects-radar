@@ -24,8 +24,6 @@ const TECH_MAPPING: Record<string, TechStack> = {
   'react-dom': { name: 'React', category: 'frontend', type: 'framework' },
   vue: { name: 'Vue', category: 'frontend', type: 'framework' },
   'vue-next': { name: 'Vue', category: 'frontend', type: 'framework' },
-  angular: { name: 'Angular', category: 'frontend', type: 'framework' },
-  '@angular/core': { name: 'Angular', category: 'frontend', type: 'framework' },
   svelte: { name: 'Svelte', category: 'frontend', type: 'framework' },
   next: { name: 'Next.js', category: 'frontend', type: 'framework' },
   'next.js': { name: 'Next.js', category: 'frontend', type: 'framework' },
@@ -73,9 +71,6 @@ const TECH_MAPPING: Record<string, TechStack> = {
   'react-icons': { name: 'React Icons', category: 'frontend', type: 'icons' },
   'font-awesome': { name: 'Font Awesome', category: 'frontend', type: 'icons' },
   'three': { name: 'Three.js', category: 'frontend', type: 'graphics' },
-  'babylonjs': { name: 'Babylon.js', category: 'frontend', type: 'graphics' },
-  'p5': { name: 'p5.js', category: 'frontend', type: 'graphics' },
-  'gsap': { name: 'GSAP', category: 'frontend', type: 'animation' },
   'framer-motion': { name: 'Framer Motion', category: 'frontend', type: 'animation' },
   'react-spring': { name: 'React Spring', category: 'frontend', type: 'animation' },
 
@@ -96,14 +91,7 @@ const TECH_MAPPING: Record<string, TechStack> = {
   '@nestjs/core': { name: 'NestJS', category: 'backend', type: 'framework' },
   hapi: { name: 'Hapi', category: 'backend', type: 'framework' },
   'restify': { name: 'Restify', category: 'backend', type: 'framework' },
-  'micro': { name: 'Micro', category: 'backend', type: 'framework' },
-  django: { name: 'Django', category: 'backend', type: 'framework' },
-  flask: { name: 'Flask', category: 'backend', type: 'framework' },
-  rails: { name: 'Rails', category: 'backend', type: 'framework' },
-  laravel: { name: 'Laravel', category: 'backend', type: 'framework' },
-  symfony: { name: 'Symfony', category: 'backend', type: 'framework' },
-  spring: { name: 'Spring', category: 'backend', type: 'framework' },
-
+  
   // Backend - APIs & GraphQL
   apollo: { name: 'Apollo', category: 'backend', type: 'graphql' },
   '@apollo/server': { name: 'Apollo Server', category: 'backend', type: 'graphql' },
@@ -111,10 +99,7 @@ const TECH_MAPPING: Record<string, TechStack> = {
   'graphql-core': { name: 'GraphQL', category: 'backend', type: 'graphql' },
   'prisma': { name: 'Prisma', category: 'backend', type: 'orm' },
   '@prisma/client': { name: 'Prisma', category: 'backend', type: 'orm' },
-  typeorm: { name: 'TypeORM', category: 'backend', type: 'orm' },
   sequelize: { name: 'Sequelize', category: 'backend', type: 'orm' },
-  knex: { name: 'Knex.js', category: 'backend', type: 'query-builder' },
-  hasura: { name: 'Hasura', category: 'backend', type: 'graphql' },
 
   // Backend - Authentication
   passport: { name: 'Passport', category: 'backend', type: 'auth' },
@@ -166,7 +151,6 @@ const TECH_MAPPING: Record<string, TechStack> = {
   selenium: { name: 'Selenium', category: 'testing', type: 'e2e' },
   '@testing-library/react': { name: 'React Testing Library', category: 'testing', type: 'testing-library' },
   '@testing-library/vue': { name: 'Vue Testing Library', category: 'testing', type: 'testing-library' },
-  chai: { name: 'Chai', category: 'testing', type: 'assertion' },
   sinon: { name: 'Sinon', category: 'testing', type: 'mocking' },
   faker: { name: 'Faker', category: 'testing', type: 'mock-data' },
   '@faker-js/faker': { name: 'Faker', category: 'testing', type: 'mock-data' },
@@ -389,7 +373,6 @@ export function detectHtmlTechStack(sourceContent: string): TechStack[] {
     'jquery': { name: 'jQuery', category: 'frontend', type: 'library' },
     'react': { name: 'React', category: 'frontend', type: 'framework' },
     'vue': { name: 'Vue', category: 'frontend', type: 'framework' },
-    'angular': { name: 'Angular', category: 'frontend', type: 'framework' },
     'alpine': { name: 'Alpine.js', category: 'frontend', type: 'framework' },
     'htmx': { name: 'HTMX', category: 'frontend', type: 'library' },
     '<style': { name: 'CSS', category: 'frontend', type: 'styling' },

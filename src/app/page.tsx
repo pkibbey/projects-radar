@@ -19,6 +19,7 @@ import { BatchGenerateButton } from "@/components/batch-generate-button";
 import { RefreshRepositoriesButton } from "@/components/refresh-repositories-button";
 import { UnhideAllReposButton } from "@/components/unhide-all-repos-button";
 import { BatchGenerateShortDescriptionsButton } from "@/components/batch-generate-short-descriptions-button";
+import { BatchGenerateReadmesButton } from "@/components/batch-generate-readmes-button";
 
 export const dynamic = "force-dynamic";
 
@@ -285,6 +286,7 @@ export default async function Home({ searchParams }: HomeProps) {
           <UnhideAllReposButton forkFilter={forkFilter} repos={fetchedRepos} />
           <BatchGenerateButton dataFilter={dataFilter} forkFilter={forkFilter} repos={fetchedRepos} />
           <BatchGenerateShortDescriptionsButton dataFilter={dataFilter} forkFilter={forkFilter} repos={fetchedRepos} />
+          <BatchGenerateReadmesButton dataFilter={dataFilter} forkFilter={forkFilter} repos={fetchedRepos} />
         </div>
       </header>
 

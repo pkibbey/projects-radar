@@ -3,9 +3,7 @@
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { ArrowUp, ArrowDown } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-
-export type SortKey = "name" | "updated" | "completeness";
-export type SortOrder = "asc" | "desc";
+import { SortOrder } from "./sort-selector";
 
 type OrderSelectorProps = {
   order?: SortOrder;

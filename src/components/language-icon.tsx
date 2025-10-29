@@ -16,7 +16,10 @@ import {
   SiReact,
   SiVuedotjs,
   SiSvelte,
-  SiAngular,
+  SiJest,
+  SiNextdotjs,
+  SiEslint,
+  SiSupabase,
 } from "react-icons/si";
 import { Code } from "lucide-react";
 import type { IconType } from "react-icons";
@@ -44,7 +47,10 @@ const languageIconMap: Record<string, IconType> = {
   React: SiReact,
   Vue: SiVuedotjs,
   Svelte: SiSvelte,
-  Angular: SiAngular,
+  Jest: SiJest,
+  "Next.js": SiNextdotjs,
+  ESLint: SiEslint,
+  Supabase: SiSupabase,
 };
 
 const languageColorMap: Record<string, string> = {
@@ -65,7 +71,10 @@ const languageColorMap: Record<string, string> = {
   React: "#61dafb",
   Vue: "#4fc08d",
   Svelte: "#ff3e00",
-  Angular: "#dd0031",
+  Jest: "#15c213",
+  "Next.js": "#000000",
+  ESLint: "#4b32c3",
+  Supabase: "#3ecf8e",
 };
 
 export const LanguageIcon = ({ language, className = "h-5 w-5" }: LanguageIconProps) => {
