@@ -321,7 +321,6 @@ export function detectCppArduinoTechStack(sourceContent: string): TechStack[] {
     '#include "Arduino.h"': { name: 'Arduino', category: 'backend', type: 'platform' },
     'setup()': { name: 'Arduino', category: 'backend', type: 'platform' },
     'loop()': { name: 'Arduino', category: 'backend', type: 'platform' },
-    '#include <WiFi.h>': { name: 'WiFi (Arduino)', category: 'backend', type: 'library' },
     '#include <Adafruit': { name: 'Adafruit Libraries', category: 'backend', type: 'libraries' },
     '#include <SPI.h>': { name: 'SPI', category: 'backend', type: 'protocol' },
     '#include <Wire.h>': { name: 'I2C/Wire', category: 'backend', type: 'protocol' },

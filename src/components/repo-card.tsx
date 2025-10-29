@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { formatDistanceToNow } from "date-fns";
 import { useState } from "react";
 import type { RepositoryBundle } from "@/lib/github";
 import type { RepoAnalysis } from "@/lib/ai";
@@ -21,7 +20,6 @@ type RepoCardProps = {
   bundle: RepositoryBundle;
   analysis: RepoAnalysis | null;
   hasData: boolean;
-  lastGeneratedAt?: string;
   id?: string;
   processingStatus?: RepoStatusRecord;
 };
@@ -30,7 +28,6 @@ export const RepoCard = ({
   bundle,
   analysis,
   hasData,
-  lastGeneratedAt,
   id,
   processingStatus,
 }: RepoCardProps) => {
@@ -38,10 +35,6 @@ export const RepoCard = ({
   const [currentSummary, setCurrentSummary] = useState(analysis?.summary ?? "");
   const [currentAnalysis] = useState(analysis);
   const [isExpanded, setIsExpanded] = useState(false);
-
-  const updatedAtText = lastGeneratedAt
-    ? formatDistanceToNow(new Date(lastGeneratedAt), { addSuffix: true })
-    : null;
 
   const showActions = hasData;
   const showTopics = hasData && meta.topics.length > 0;
@@ -83,54 +76,35 @@ export const RepoCard = ({
         "scroll-mt-42",
       )}
     >
-      <div className="absolute -right-3 -top-3 z-10 flex gap-2 items-center">
-        {updatedAtText && (
-          <p className="text-xs text-slate-400 dark:text-slate-500 bg-slate-50 px-3 leading-7 rounded-xl border">
-            Updated {updatedAtText}
-            {currentAnalysis?.analysisDurationMs && (
-              <>
-                {" • "}
-                Analyzed in {(currentAnalysis.analysisDurationMs / 1000).toFixed(1)}s
-              </>
-            )}
-          </p>
-        )}
-        <ExternalLinkButton htmlUrl={meta.htmlUrl} />
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => setIsExpanded(!isExpanded)}
-          title={isExpanded ? "Hide info" : "Show info"}
-          className="h-7 w-7 rounded-full bg-slate-100/80 text-slate-500 hover:bg-orange-200 hover:text-orange-700 dark:bg-slate-800/80 dark:hover:bg-orange-700 dark:hover:text-orange-200 cursor-pointer border"
-        >
-          <InfoIcon className="h-4 w-4" />
-        </Button>
-        <HideRepoButton owner={meta.owner} repo={meta.name} />
-      </div>
       <header
         className="flex flex-wrap items-start justify-between gap-3"
       >
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            {hasLanguage && (
-              <div className="flex items-center gap-2">
-                <LanguageIcon
-                  language={meta.primaryLanguage!}
-                  className="h-5 w-5"
-                />
-              </div>
-            )}
-            {hasData && currentAnalysis?.techStack && (
-                <TechStackDisplay 
-                  techStack={currentAnalysis.techStack}
-                />
-            )}
+        <div className="space-y-1 w-full">
+          <div className="flex justify-between">
+            <h2 className="flex gap-2 text-xl font-semibold text-slate-900 dark:text-slate-100">
+              <Link href={`/repos/${meta.owner}/${meta.name}`}>
+                {meta.displayName}
+              </Link>
+              <ExternalLinkButton htmlUrl={meta.htmlUrl} />
+            </h2>
+            <div className="flex items-center gap-2">
+              {hasData && currentAnalysis?.techStack && (
+                  <TechStackDisplay 
+                    techStack={currentAnalysis.techStack}
+                  />
+              )}
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setIsExpanded(!isExpanded)}
+                title={isExpanded ? "Hide info" : "Show info"}
+                className="h-7 w-7 rounded-full bg-slate-100/80 text-slate-500 hover:bg-orange-200 hover:text-orange-700 dark:bg-slate-800/80 dark:hover:bg-orange-700 dark:hover:text-orange-200 cursor-pointer border"
+              >
+                <InfoIcon className="h-4 w-4" />
+              </Button>
+              <HideRepoButton owner={meta.owner} repo={meta.name} />
+            </div>
           </div>
-          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-            <Link href={`/repos/${meta.owner}/${meta.name}`}>
-              {meta.displayName}
-            </Link>
-          </h2>
           <p
             className={cn(
               "max-w-2xl text-slate-600 dark:text-slate-300",

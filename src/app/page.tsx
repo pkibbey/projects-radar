@@ -107,7 +107,7 @@ async function DashboardContent({ sortMode, sortOrder, dataFilter, forkFilter, r
     return (
       <div className="mx-auto max-w-2xl text-center text-sm text-slate-600 dark:text-slate-300">
         <p className="font-medium">
-          No repositories loaded. Click "Load Repos" to fetch your repositories from GitHub.
+          No repositories loaded. Click &quot;Load Repos&quot; to fetch your repositories from GitHub.
         </p>
       </div>
     );
@@ -223,7 +223,6 @@ async function DashboardContent({ sortMode, sortOrder, dataFilter, forkFilter, r
               bundle={project.bundle}
               analysis={project.analysis}
               hasData={project.hasData}
-              lastGeneratedAt={project.updatedAt ?? undefined}
               id={`${project.bundle.meta.owner}-${project.bundle.meta.name}`}
               processingStatus={project.processingStatus ?? undefined}
             />

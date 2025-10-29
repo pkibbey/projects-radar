@@ -35,6 +35,45 @@ const languageNames = new Set([
   "Next.js",
   "ESLint",
   "Supabase",
+  "React Testing Library",
+  "React Icons",
+  "Tailwind CSS",
+  "Express",
+  "Prisma",
+  "MongoDB",
+  "Astro",
+  "Fastify",
+  "Axios",
+  "Redis",
+  "AWS",
+  "Vite",
+  "Node Fetch",
+  "Radix UI",
+  "Lucide Icons",
+  "PostCSS",
+  "Turbopack",
+  "Zod",
+  "shadcn/ui",
+  "SQLite",
+  "date-fns",
+  "dotenv",
+  "Moment.js",
+  "React Router",
+  "Styled Components",
+  "Framer Motion",
+  "Zustand",
+  "Lodash",
+  "Redux",
+  "Vercel",
+  "TanStack Query",
+  "Arduino",
+  "Adafruit Libraries",
+  "React Hook Form",
+  "Sass",
+  "Grunt",
+  "WiFi (Arduino)",
+  "Angular",
+  "Chai",
 ]);
 
 export const TechStackDisplay = ({
@@ -74,17 +113,61 @@ export const TechStackDisplay = ({
     );
   };
 
+  // Get all icon names that should be displayed
+  const getIconName = (techName: string): string => {
+    // Map tech names to their icon base names
+    const iconMap: Record<string, string> = {
+      "React": "React",
+      "React Testing Library": "React",
+      "React Icons": "React",
+      "Radix UI": "React",
+      "React Router": "React",
+      "Styled Components": "React",
+      "Framer Motion": "React",
+      "Zustand": "Zustand",
+      "Redux": "React",
+      "TanStack Query": "React",
+      "React Hook Form": "React",
+      "shadcn/ui": "React",
+      "Lucide Icons": "React",
+      "JavaScript": "JavaScript",
+      "date-fns": "JavaScript",
+      "Moment.js": "JavaScript",
+      "Lodash": "JavaScript",
+      "TypeScript": "TypeScript",
+      "Zod": "TypeScript",
+      "Arduino": "Arduino",
+      "WiFi (Arduino)": "Arduino",
+      "Adafruit Libraries": "Arduino",
+      "Node Fetch": "Node.js",
+      "Turbopack": "Node.js",
+      "dotenv": "Node.js",
+    };
+    return iconMap[techName] || techName;
+  };
+
+  // Collect unique icons
+  const seenIcons = new Set<string>();
+  const filteredItems: TechStack[] = [];
+
+  categories.forEach((category) => {
+    const items = techStack[category] || [];
+    items.forEach((item) => {
+      if (languageNames.has(item.name)) {
+        const iconName = getIconName(item.name);
+        if (!seenIcons.has(iconName)) {
+          seenIcons.add(iconName);
+          filteredItems.push(item);
+        }
+      } else {
+        filteredItems.push(item);
+      }
+    });
+  });
+
   return (
     <div className="flex flex-wrap gap-2">
-      {categories.map((category) => {
-        const items = techStack[category] || [];
-
-        if (items.length === 0) {
-          return null;
-        }
-
-        return items.map(renderTechItem);
-      })}
+      {filteredItems.map((item) => renderTechItem(item))}
     </div>
   );
 };
