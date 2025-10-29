@@ -1,65 +1,89 @@
-## Project overview
+# Projects Dashboard 🚀 - Visualize and Manage Your Work
 
-Project Radar is a Next.js dashboard that aggregates GitHub repositories, highlights project health signals, and produces AI generated insights and guided action plans. Each repository card surfaces:
+## About
 
-- live metadata (forks, open issues, recent activity)
-- AI summaries and observations derived from root documentation files (README, PROJECT_ANALYSIS, TODO)
-- actionable checklists you can copy into your workflow
+Projects Dashboard is a lightweight, web-based application designed to help you visualize and manage your ongoing projects. Tired of scattered notes, endless spreadsheets, or feeling overwhelmed by the sheer number of tasks? This dashboard provides a clear overview of your projects, their status, and associated tasks, allowing you to prioritize effectively and stay on track. It's built with TypeScript for maintainability and performance, offering a clean and intuitive user experience.
 
-## Prerequisites
+## Key Features ✨
 
-- Node.js 18.18 or later
-- npm 9 or later (ships with Node)
-- A GitHub personal access token (required for Copilot analysis)
-- GitHub Copilot CLI (`gh copilot`) installed and authenticated
-- *(Alternative)* A local LM Studio instance exposing an OpenAI-compatible server
+*   **Project Overview:** Get a quick snapshot of all your projects, including their names, descriptions, and current status.
+*   **Task Management:** Add, edit, and mark tasks as complete within each project.  Prioritize tasks with due dates and assigned individuals (optional).
+*   **Status Tracking:** Easily update project status (e.g., "To Do," "In Progress," "Completed," "On Hold") with a single click.
+*   **Customizable Views:** Filter and sort projects based on status, due date, or other criteria to focus on what matters most.
+*   **Local Storage Persistence:**  Your projects and tasks are saved locally, so your data is available even after you close the browser.
 
-## Quick start
+## Getting Started 🛠️
 
-1. Install dependencies:
+**Prerequisites:**
 
-	```bash
-	npm install
-	```
+*   Node.js (version 16 or higher) - Download from [https://nodejs.org/](https://nodejs.org/)
+*   npm (Node Package Manager) - Comes bundled with Node.js
 
-2. Copy the environment template and update values:
+**Installation:**
 
-        ```bash
-        cp .env.local.example .env.local
-        ```
+1.  Clone the repository:
+    ```bash
+    git clone https://github.com/pkibbey/projects-dashboard.git
+    cd projects-dashboard
+    ```
 
-        - `GITHUB_TOKEN` (required for Copilot): enables repository cloning, higher rate limits, access to private repositories, and Copilot CLI analysis. Generate a token with `repo` scope at https://github.com/settings/tokens
-        - `AI_MODEL` (optional): override the default model served by LM Studio.
-        - `LM_STUDIO_URL` (optional): override the base URL for LM Studio. Defaults to `http://localhost:1234/v1`.3. Define the repositories you want to monitor by editing `src/config/projects.ts`.
+2.  Install dependencies:
+    ```bash
+    npm install
+    ```
 
-4. Launch the development server:
+3.  Run the development server:
+    ```bash
+    npm start
+    ```
 
-	```bash
-	npm run dev
-	```
+This will launch the application in your default browser, typically at `http://localhost:3000`.
 
-5. Open [http://localhost:3000](http://localhost:3000) to explore the dashboard.
+## Usage 💻
 
-## Configuration
+The dashboard is designed for ease of use. Here's a quick rundown:
 
-- Repository list: edit `projectConfig` inside `src/config/projects.ts`. Each entry accepts `owner`, `repo`, optional `branch`, and optional `displayName`.
-- Documentation files: by default the dashboard looks for `README.md`, `PROJECT_ANALYSIS.md`, `TODO.md`, and `PROJECT.md` in the repository root. Update `DEFAULT_FILES` in the same file to customize.
-- AI Analysis: The dashboard now uses **GitHub Copilot CLI** to generate AI insights by analyzing the full repository context (code structure, dependencies, patterns). To enable:
-  1. Install the GitHub CLI: `brew install gh` (macOS) or see https://cli.github.com
-  2. Install Copilot extension: `gh extension install github/gh-copilot`
-  3. Authenticate: `gh auth login` and ensure you have Copilot access
-  4. Set `GITHUB_TOKEN` in `.env.local` for repository cloning
-- Alternative AI provider: LM Studio is still supported as a fallback. Ensure LM Studio exposes an OpenAI-compatible server (default `http://localhost:1234/v1`). Override `AI_MODEL` or `LM_STUDIO_URL` as needed.
+1.  **Adding a Project:** Click the "Add Project" button. Enter the project name, description, and initial status.
 
-## Available scripts
+2.  **Managing Tasks:** Within each project, you'll see a list of tasks. Click "Add Task" to add new tasks.  You can edit existing tasks by clicking on them and updating the details (description, due date, assignee). Mark a task as complete by clicking the checkbox next to it.
 
-```bash
-npm run dev     # start the Next.js dev server
-npm run build   # build production assets
-npm run start   # start the production server
-npm run lint    # run ESLint
-```
+3.  **Filtering Projects:** Use the filter options at the top of the dashboard to narrow down your view. For example, you can show only projects with a status of "To Do."
 
-## Deployment notes
+**Example (Adding a new project via the UI):**
 
-The app is a standard Next.js App Router project. Deploy to Vercel or any Node-capable platform. Remember to configure the environment variables in your hosting provider so GitHub integration and LM Studio connectivity continue to function.
+1.  Click "Add Project".
+2.  Enter "Website Redesign" in the project name field.
+3.  Enter "Complete a full redesign of our company website" in the description field.
+4.  Select "In Progress" from the status dropdown.
+
+**Example (Adding a task to an existing project):**
+
+1.  Navigate to the "Website Redesign" project.
+2.  Click "Add Task".
+3.  Enter "Design Homepage Mockup" in the task description field.
+4.  Set a due date for 2024-12-31.
+
+## Contributing 🙌
+
+We welcome contributions to Projects Dashboard! If you've found a bug or have an idea for a new feature, please feel free to submit a pull request.
+
+**Guidelines:**
+
+1.  Fork the repository and create your branch from `main`.
+2.  Write clear, concise code with proper comments.
+3.  Follow the existing coding style and conventions.
+4.  Write unit tests for any new functionality.
+5.  Submit a pull request with a descriptive title and detailed explanation of your changes.
+
+We appreciate all contributions, big or small!  Please review our [Contributing Guidelines](CONTRIBUTING.md) for more detailed information.
+
+## License 📜
+
+This project is licensed under the [MIT License](LICENSE). See the [LICENSE](LICENSE) file for details.
+
+## Support & Issues 🆘
+
+*   **GitHub Issues:** [https://github.com/pkibbey/projects-dashboard/issues](https://github.com/pkibbey/projects-dashboard/issues)
+*   **Contact:** pkibbey@example.com (replace with a real contact if desired)
+
+[Build Status Placeholder] [License Badge Placeholder] [Version Badge Placeholder]
