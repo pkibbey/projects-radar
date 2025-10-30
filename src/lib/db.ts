@@ -15,7 +15,7 @@ type StoredValue = {
   updatedAt: string;
 };
 
-export type RepoRecord = StoredValue & {
+type RepoRecord = StoredValue & {
   key: string;
   id?: number;
 };
@@ -64,12 +64,14 @@ const getDB = () => {
     db.exec(`
       CREATE TABLE IF NOT EXISTS repo_status (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        key TEXT UNIQUE NOT NULL,
+        key TEXT NOT NULL,
+        functionType TEXT NOT NULL DEFAULT 'analyze',
         status TEXT NOT NULL DEFAULT 'pending',
         statusUpdatedAt TEXT NOT NULL,
         startedAt TEXT,
         completedAt TEXT,
         errorMessage TEXT,
+        UNIQUE(key, functionType),
         FOREIGN KEY(key) REFERENCES repos(key) ON DELETE CASCADE
       )
     `);
@@ -77,6 +79,7 @@ const getDB = () => {
     // Create index on key and status for faster lookups
     db.exec(`CREATE INDEX IF NOT EXISTS idx_repo_status_key ON repo_status(key)`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_repo_status_status ON repo_status(status)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_repo_status_function ON repo_status(functionType)`);
 
     // Create table for tracking hidden repositories
     db.exec(`
@@ -89,6 +92,27 @@ const getDB = () => {
 
     // Create index on key for faster lookups
     db.exec(`CREATE INDEX IF NOT EXISTS idx_hidden_repos_key ON hidden_repos(key)`);
+
+    // Create table for project learnings
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS project_learnings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key TEXT UNIQUE NOT NULL,
+        problem TEXT,
+        architecture TEXT,
+        keyLearnings TEXT,
+        lessonsForImprovement TEXT,
+        skillsUsed TEXT,
+        timeInvested TEXT,
+        statusReason TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        FOREIGN KEY(key) REFERENCES repos(key) ON DELETE CASCADE
+      )
+    `);
+
+    // Create index on key for faster lookups
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_project_learnings_key ON project_learnings(key)`);
 
     // Migration: Add ownership columns if they don't exist
     try {
@@ -108,11 +132,18 @@ const getDB = () => {
     } catch (e) {
       // Column already exists, ignore
     }
+
+    // Migration: Add functionType column to repo_status if it doesn't exist
+    try {
+      db.prepare("ALTER TABLE repo_status ADD COLUMN functionType TEXT NOT NULL DEFAULT 'analyze'").run();
+    } catch (e) {
+      // Column already exists, ignore
+    }
   }
   return db;
 };
 
-export const getRepoData = async (owner: string, repo: string) => {
+const getRepoData = async (owner: string, repo: string) => {
   const db = getDB();
   const key = keyFor(owner, repo);
   
@@ -130,7 +161,7 @@ export const getRepoData = async (owner: string, repo: string) => {
   } as RepoRecord;
 };
 
-export const listRepoData = async () => {
+const listRepoData = async () => {
   const db = getDB();
   
   const stmt = db.prepare('SELECT * FROM repos');
@@ -145,7 +176,7 @@ export const listRepoData = async () => {
   })) as RepoRecord[];
 };
 
-export const upsertRepoData = async (
+const upsertRepoData = async (
   owner: string,
   repo: string,
   value: { bundle: RepositoryBundle; analysis: RepoAnalysis | null },
@@ -173,7 +204,7 @@ export const upsertRepoData = async (
   return getRepoData(owner, repo);
 };
 
-export const clearRepoData = async (owner: string, repo: string) => {
+const clearRepoData = async (owner: string, repo: string) => {
   const db = getDB();
   const key = keyFor(owner, repo);
   
@@ -181,7 +212,7 @@ export const clearRepoData = async (owner: string, repo: string) => {
   stmt.run(key);
 };
 
-export const updateRepoSummary = async (
+const updateRepoSummary = async (
   owner: string,
   repo: string,
   summary: string,
@@ -212,7 +243,7 @@ export const updateRepoSummary = async (
   return getRepoData(owner, repo);
 };
 
-export const updateRepoDescription = async (
+const updateRepoDescription = async (
   owner: string,
   repo: string,
   description: string,
@@ -249,7 +280,7 @@ export const updateRepoDescription = async (
   return getRepoData(owner, repo);
 };
 
-export const saveFetchedRepositories = async (repos: Array<{ owner: string; repo: string; displayName: string; isFork: boolean; ownerUsername: string; isOwnedByUser: boolean }>) => {
+const saveFetchedRepositories = async (repos: Array<{ owner: string; repo: string; displayName: string; isFork: boolean; ownerUsername: string; isOwnedByUser: boolean }>) => {
   const db = getDB();
   
   // Clear existing repos
@@ -270,7 +301,7 @@ export const saveFetchedRepositories = async (repos: Array<{ owner: string; repo
   await syncFetchedReposToRepos();
 };
 
-export const syncFetchedReposToRepos = async () => {
+const syncFetchedReposToRepos = async () => {
   const db = getDB();
   const fetchedRepos = await getFetchedRepositories();
   
@@ -292,7 +323,7 @@ export const syncFetchedReposToRepos = async () => {
   }
 };
 
-export const getFetchedRepositories = async () => {
+const getFetchedRepositories = async () => {
   const db = getDB();
   
   const stmt = db.prepare('SELECT owner, repo, displayName, ownerUsername, isOwnedByUser, isFork FROM fetched_repos ORDER BY owner, repo');
@@ -308,10 +339,12 @@ export const getFetchedRepositories = async () => {
   }));
 };
 
-export type RepoProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed';
+type RepoProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed';
+type FunctionType = 'analyze' | 'short-description' | 'readme';
 
 export type RepoStatusRecord = {
   key: string;
+  functionType: FunctionType;
   status: RepoProcessingStatus;
   statusUpdatedAt: string;
   startedAt: string | null;
@@ -319,20 +352,21 @@ export type RepoStatusRecord = {
   errorMessage: string | null;
 };
 
-export const setRepoStatus = async (
+const setRepoStatus = async (
   owner: string,
   repo: string,
   status: RepoProcessingStatus,
-  errorMessage?: string | null
+  errorMessage?: string | null,
+  functionType: FunctionType = 'analyze'
 ) => {
   const db = getDB();
   const key = keyFor(owner, repo);
   const now = new Date().toISOString();
   
   const stmt = db.prepare(`
-    INSERT INTO repo_status (key, status, statusUpdatedAt, startedAt, completedAt, errorMessage)
-    VALUES (?, ?, ?, ?, ?, ?)
-    ON CONFLICT(key) DO UPDATE SET
+    INSERT INTO repo_status (key, functionType, status, statusUpdatedAt, startedAt, completedAt, errorMessage)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(key, functionType) DO UPDATE SET
       status = excluded.status,
       statusUpdatedAt = excluded.statusUpdatedAt,
       startedAt = CASE WHEN excluded.status = 'processing' THEN excluded.startedAt ELSE startedAt END,
@@ -342,6 +376,7 @@ export const setRepoStatus = async (
   
   stmt.run(
     key,
+    functionType,
     status,
     now,
     status === 'processing' ? now : null,
@@ -350,17 +385,18 @@ export const setRepoStatus = async (
   );
 };
 
-export const getRepoStatus = async (owner: string, repo: string): Promise<RepoStatusRecord | null> => {
+const getRepoStatus = async (owner: string, repo: string, functionType: FunctionType = 'analyze'): Promise<RepoStatusRecord | null> => {
   const db = getDB();
   const key = keyFor(owner, repo);
   
-  const stmt = db.prepare('SELECT * FROM repo_status WHERE key = ?');
-  const row = stmt.get(key) as any;
+  const stmt = db.prepare('SELECT * FROM repo_status WHERE key = ? AND functionType = ?');
+  const row = stmt.get(key, functionType) as any;
   
   if (!row) return null;
   
   return {
     key: row.key,
+    functionType: row.functionType,
     status: row.status,
     statusUpdatedAt: row.statusUpdatedAt,
     startedAt: row.startedAt,
@@ -369,7 +405,7 @@ export const getRepoStatus = async (owner: string, repo: string): Promise<RepoSt
   };
 };
 
-export const getReposByStatus = async (status: RepoProcessingStatus): Promise<RepoStatusRecord[]> => {
+const getReposByStatus = async (status: RepoProcessingStatus): Promise<RepoStatusRecord[]> => {
   const db = getDB();
   
   const stmt = db.prepare('SELECT * FROM repo_status WHERE status = ? ORDER BY statusUpdatedAt DESC');
@@ -377,6 +413,7 @@ export const getReposByStatus = async (status: RepoProcessingStatus): Promise<Re
   
   return rows.map(row => ({
     key: row.key,
+    functionType: row.functionType,
     status: row.status,
     statusUpdatedAt: row.statusUpdatedAt,
     startedAt: row.startedAt,
@@ -385,7 +422,7 @@ export const getReposByStatus = async (status: RepoProcessingStatus): Promise<Re
   }));
 };
 
-export const getReposByStatuses = async (statuses: RepoProcessingStatus[]): Promise<RepoStatusRecord[]> => {
+const getReposByStatuses = async (statuses: RepoProcessingStatus[]): Promise<RepoStatusRecord[]> => {
   const db = getDB();
   
   const placeholders = statuses.map(() => '?').join(',');
@@ -394,6 +431,7 @@ export const getReposByStatuses = async (statuses: RepoProcessingStatus[]): Prom
   
   return rows.map(row => ({
     key: row.key,
+    functionType: row.functionType,
     status: row.status,
     statusUpdatedAt: row.statusUpdatedAt,
     startedAt: row.startedAt,
@@ -402,7 +440,7 @@ export const getReposByStatuses = async (statuses: RepoProcessingStatus[]): Prom
   }));
 };
 
-export const hideRepo = async (owner: string, repo: string): Promise<void> => {
+const hideRepo = async (owner: string, repo: string): Promise<void> => {
   const db = getDB();
   const key = keyFor(owner, repo);
   const hiddenAt = new Date().toISOString();
@@ -417,7 +455,7 @@ export const hideRepo = async (owner: string, repo: string): Promise<void> => {
   stmt.run(key, hiddenAt);
 };
 
-export const unhideRepo = async (owner: string, repo: string): Promise<void> => {
+const unhideRepo = async (owner: string, repo: string): Promise<void> => {
   const db = getDB();
   const key = keyFor(owner, repo);
   
@@ -425,7 +463,7 @@ export const unhideRepo = async (owner: string, repo: string): Promise<void> => 
   stmt.run(key);
 };
 
-export const getHiddenRepos = async (): Promise<string[]> => {
+const getHiddenRepos = async (): Promise<string[]> => {
   const db = getDB();
   
   const stmt = db.prepare('SELECT key FROM hidden_repos');
@@ -434,7 +472,7 @@ export const getHiddenRepos = async (): Promise<string[]> => {
   return rows.map(row => row.key);
 };
 
-export const isRepoHidden = async (owner: string, repo: string): Promise<boolean> => {
+const isRepoHidden = async (owner: string, repo: string): Promise<boolean> => {
   const db = getDB();
   const key = keyFor(owner, repo);
   
@@ -442,6 +480,164 @@ export const isRepoHidden = async (owner: string, repo: string): Promise<boolean
   const row = stmt.get(key) as { 1: number } | undefined;
   
   return Boolean(row);
+};
+
+/**
+ * Get the aggregated status for a repo across all function types.
+ * Returns the worst status among all functions, with priority: processing > pending > failed > completed
+ */
+const getRepoAggregatedStatus = async (owner: string, repo: string): Promise<RepoStatusRecord | null> => {
+  const db = getDB();
+  const key = keyFor(owner, repo);
+  
+  const stmt = db.prepare('SELECT * FROM repo_status WHERE key = ? ORDER BY statusUpdatedAt DESC');
+  const rows = stmt.all(key) as any[];
+  
+  if (rows.length === 0) return null;
+  
+  // Priority order: processing > pending > failed > completed
+  const statusPriority: Record<string, number> = {
+    'processing': 3,
+    'pending': 2,
+    'failed': 1,
+    'completed': 0,
+  };
+  
+  // Find the status with highest priority
+  const worstStatus = rows.reduce((worst, current) => {
+    const currentPriority = statusPriority[current.status] ?? -1;
+    const worstPriority = statusPriority[worst.status] ?? -1;
+    return currentPriority > worstPriority ? current : worst;
+  });
+  
+  return {
+    key: worstStatus.key,
+    functionType: worstStatus.functionType,
+    status: worstStatus.status,
+    statusUpdatedAt: worstStatus.statusUpdatedAt,
+    startedAt: worstStatus.startedAt,
+    completedAt: worstStatus.completedAt,
+    errorMessage: worstStatus.errorMessage,
+  };
+};
+
+// ===== Project Learnings =====
+
+export type StatusReason = 
+  | "learning-complete" 
+  | "deprioritized" 
+  | "overcomplicated" 
+  | "shifted-focus"
+  | "on-hold";
+
+export type ProjectLearning = {
+  id?: number;
+  key: string;
+  problem: string | null;
+  architecture: string | null;
+  keyLearnings: string[]; // JSON array stored as string
+  lessonsForImprovement: string[]; // JSON array stored as string
+  skillsUsed: string[]; // JSON array stored as string
+  timeInvested: string | null;
+  statusReason: StatusReason | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+const getProjectLearning = async (owner: string, repo: string): Promise<ProjectLearning | null> => {
+  const db = getDB();
+  const key = keyFor(owner, repo);
+  
+  const stmt = db.prepare('SELECT * FROM project_learnings WHERE key = ?');
+  const row = stmt.get(key) as any;
+  
+  if (!row) return null;
+  
+  return {
+    id: row.id,
+    key: row.key,
+    problem: row.problem,
+    architecture: row.architecture,
+    keyLearnings: row.keyLearnings ? JSON.parse(row.keyLearnings) : [],
+    lessonsForImprovement: row.lessonsForImprovement ? JSON.parse(row.lessonsForImprovement) : [],
+    skillsUsed: row.skillsUsed ? JSON.parse(row.skillsUsed) : [],
+    timeInvested: row.timeInvested,
+    statusReason: row.statusReason,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+};
+
+const upsertProjectLearning = async (
+  owner: string,
+  repo: string,
+  learning: Omit<ProjectLearning, 'id' | 'key' | 'createdAt' | 'updatedAt'>
+): Promise<ProjectLearning | null> => {
+  const db = getDB();
+  const key = keyFor(owner, repo);
+  const now = new Date().toISOString();
+  
+  // Check if learning exists
+  const existing = await getProjectLearning(owner, repo);
+  const createdAt = existing?.createdAt || now;
+  
+  const stmt = db.prepare(`
+    INSERT INTO project_learnings (key, problem, architecture, keyLearnings, lessonsForImprovement, skillsUsed, timeInvested, statusReason, createdAt, updatedAt)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(key) DO UPDATE SET
+      problem = excluded.problem,
+      architecture = excluded.architecture,
+      keyLearnings = excluded.keyLearnings,
+      lessonsForImprovement = excluded.lessonsForImprovement,
+      skillsUsed = excluded.skillsUsed,
+      timeInvested = excluded.timeInvested,
+      statusReason = excluded.statusReason,
+      updatedAt = excluded.updatedAt
+  `);
+  
+  stmt.run(
+    key,
+    learning.problem || null,
+    learning.architecture || null,
+    JSON.stringify(learning.keyLearnings || []),
+    JSON.stringify(learning.lessonsForImprovement || []),
+    JSON.stringify(learning.skillsUsed || []),
+    learning.timeInvested || null,
+    learning.statusReason || null,
+    createdAt,
+    now
+  );
+  
+  return getProjectLearning(owner, repo);
+};
+
+const deleteProjectLearning = async (owner: string, repo: string): Promise<void> => {
+  const db = getDB();
+  const key = keyFor(owner, repo);
+  
+  const stmt = db.prepare('DELETE FROM project_learnings WHERE key = ?');
+  stmt.run(key);
+};
+
+const listProjectLearnings = async (): Promise<ProjectLearning[]> => {
+  const db = getDB();
+  
+  const stmt = db.prepare('SELECT * FROM project_learnings ORDER BY updatedAt DESC');
+  const rows = stmt.all() as any[];
+  
+  return rows.map(row => ({
+    id: row.id,
+    key: row.key,
+    problem: row.problem,
+    architecture: row.architecture,
+    keyLearnings: row.keyLearnings ? JSON.parse(row.keyLearnings) : [],
+    lessonsForImprovement: row.lessonsForImprovement ? JSON.parse(row.lessonsForImprovement) : [],
+    skillsUsed: row.skillsUsed ? JSON.parse(row.skillsUsed) : [],
+    timeInvested: row.timeInvested,
+    statusReason: row.statusReason,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  }));
 };
 
 const _db = {
@@ -458,10 +654,15 @@ const _db = {
   getRepoStatus,
   getReposByStatus,
   getReposByStatuses,
+  getRepoAggregatedStatus,
   hideRepo,
   unhideRepo,
   getHiddenRepos,
   isRepoHidden,
+  getProjectLearning,
+  upsertProjectLearning,
+  deleteProjectLearning,
+  listProjectLearnings,
 };
 
 export default _db;

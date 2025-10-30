@@ -1,7 +1,7 @@
 import { inngest } from "@/lib/inngest";
 import db from "@/lib/db";
 import { fetchRepositoryBundle } from "@/lib/github";
-import { generateRepoAnalysis, generateShortDescription } from "@/lib/ai";
+import { generateRepoAnalysis, generateShortDescription, generateReadmeContent } from "@/lib/ai";
 import { fetchAndExtractTechStack } from "@/lib/tech-stack-fetcher";
 import { fetchUserRepositories } from "@/lib/github-user-repos";
 import { cloneRepoForAnalysis, cleanupRepo } from "@/lib/repo-cloner";
@@ -21,7 +21,7 @@ export const processSingleRepository = inngest.createFunction(
 
     try {
       // Mark as processing
-      await db.setRepoStatus(owner, repo, "processing");
+      await db.setRepoStatus(owner, repo, "processing", undefined, "analyze");
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const bundleEntry = { owner, repo } as any;
@@ -51,7 +51,7 @@ export const processSingleRepository = inngest.createFunction(
       });
 
       // Mark as completed
-      await db.setRepoStatus(owner, repo, "completed");
+      await db.setRepoStatus(owner, repo, "completed", undefined, "analyze");
 
       logger.info(`Successfully processed ${owner}/${repo}`);
       return { success: true, key };
@@ -64,19 +64,19 @@ export const processSingleRepository = inngest.createFunction(
           `Skipping ${owner}/${repo}: Access denied (private repository or insufficient permissions)`
         );
         // Mark as completed with skipped status
-        await db.setRepoStatus(owner, repo, "completed");
+        await db.setRepoStatus(owner, repo, "completed", undefined, "analyze");
         return { success: true, key, skipped: true, reason: "Access denied" };
       }
 
       // Check if it's a rate limit error
       if (errorMessage.includes("rate limit")) {
         logger.error(`Rate limit hit for ${owner}/${repo}`);
-        await db.setRepoStatus(owner, repo, "failed", errorMessage);
+        await db.setRepoStatus(owner, repo, "failed", errorMessage, "analyze");
         throw error; // Re-throw to trigger Inngest retry
       }
 
       logger.error(`Failed to process ${owner}/${repo}:`, error);
-      await db.setRepoStatus(owner, repo, "failed", errorMessage);
+      await db.setRepoStatus(owner, repo, "failed", errorMessage, "analyze");
       throw error; // Re-throw to trigger Inngest retry
     }
   }
@@ -151,7 +151,7 @@ export const refreshRepositoryIntelligence = inngest.createFunction(
 
     try {
       // Mark as processing
-      await db.setRepoStatus(owner, repo, "processing");
+      await db.setRepoStatus(owner, repo, "processing", undefined, "analyze");
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const bundleEntry = { owner, repo } as any;
@@ -181,13 +181,13 @@ export const refreshRepositoryIntelligence = inngest.createFunction(
       });
 
       // Mark as completed
-      await db.setRepoStatus(owner, repo, "completed");
+      await db.setRepoStatus(owner, repo, "completed", undefined, "analyze");
 
       logger.info(`Successfully refreshed intelligence for ${owner}/${repo}`);
       return { success: true, owner, repo };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      await db.setRepoStatus(owner, repo, "failed", errorMessage);
+      await db.setRepoStatus(owner, repo, "failed", errorMessage, "analyze");
       logger.error(`Failed to refresh intelligence for ${owner}/${repo}:`, error);
       throw error;
     }
@@ -309,7 +309,7 @@ export const generateSingleShortDescription = inngest.createFunction(
 
     try {
       // Mark as processing
-      await db.setRepoStatus(owner, repo, "processing");
+      await db.setRepoStatus(owner, repo, "processing", undefined, "short-description");
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const bundleEntry = { owner, repo } as any;
@@ -320,7 +320,7 @@ export const generateSingleShortDescription = inngest.createFunction(
       await db.updateRepoDescription(owner, repo, shortDescription);
 
       // Mark as completed
-      await db.setRepoStatus(owner, repo, "completed");
+      await db.setRepoStatus(owner, repo, "completed", undefined, "short-description");
 
       logger.info(`Successfully generated short description for ${owner}/${repo}`, shortDescription);
       return { success: true, key: `${owner}/${repo}`, description: shortDescription };
@@ -333,19 +333,19 @@ export const generateSingleShortDescription = inngest.createFunction(
           `Skipping ${owner}/${repo}: Access denied (private repository or insufficient permissions)`
         );
         // Mark as completed with skipped status
-        await db.setRepoStatus(owner, repo, "completed");
+        await db.setRepoStatus(owner, repo, "completed", undefined, "short-description");
         return { success: true, key: `${owner}/${repo}`, skipped: true, reason: "Access denied" };
       }
 
       // Check if it's a rate limit error
       if (errorMessage.includes("rate limit")) {
         logger.error(`Rate limit hit for ${owner}/${repo}`);
-        await db.setRepoStatus(owner, repo, "failed", errorMessage);
+        await db.setRepoStatus(owner, repo, "failed", errorMessage, "short-description");
         throw error; // Re-throw to trigger Inngest retry
       }
 
       logger.error(`Failed to generate short description for ${owner}/${repo}:`, error);
-      await db.setRepoStatus(owner, repo, "failed", errorMessage);
+      await db.setRepoStatus(owner, repo, "failed", errorMessage, "short-description");
       throw error; // Re-throw to trigger Inngest retry
     }
   }
@@ -372,6 +372,14 @@ export const generateBatchShortDescriptions = inngest.createFunction(
       } else if (forkFilter === "without-forks") {
         repos = repos.filter((repo) => !repo.isFork);
       }
+
+      // Filter out hidden repositories
+      const hiddenRepos = await db.getHiddenRepos();
+      const hiddenReposSet = new Set(hiddenRepos);
+      repos = repos.filter((repo) => {
+        const key = `${repo.owner.toLowerCase()}/${repo.repo.toLowerCase()}`;
+        return !hiddenReposSet.has(key);
+      });
 
       logger.info(`Found ${repos.length} repositories to process for short descriptions`);
 
@@ -420,25 +428,17 @@ export const generateSingleReadme = inngest.createFunction(
     logger.info(`Generating README for ${owner}/${repo}`);
 
     try {
-      // Fetch repository details from GitHub
-      const repoResponse = await fetch(
-        `https://api.github.com/repos/${owner}/${repo}`,
-        {
-          headers: {
-            Authorization: `token ${token}`,
-            Accept: "application/vnd.github.v3+json",
-          },
-        }
-      );
+      // Mark as processing
+      await db.setRepoStatus(owner, repo, "processing", undefined, "readme");
 
-      if (!repoResponse.ok) {
-        throw new Error(`Failed to fetch repository: ${repoResponse.statusText}`);
-      }
+      // Fetch repository bundle for AI analysis
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const bundleEntry = { owner, repo } as any;
+      const bundle = await fetchRepositoryBundle(bundleEntry, token);
 
-      const repoData = await repoResponse.json();
-
-      // Generate README content
-      const readmeContent = await generateREADMEContent(repoData);
+      // Generate README content using AI
+      logger.info(`Analyzing ${owner}/${repo} to generate README...`);
+      const readmeContent = await generateReadmeContent(bundle);
 
       // Check if README already exists to get its SHA
       let sha: string | undefined;
@@ -486,6 +486,9 @@ export const generateSingleReadme = inngest.createFunction(
         );
       }
 
+      // Mark as completed
+      await db.setRepoStatus(owner, repo, "completed", undefined, "readme");
+
       logger.info(`Successfully generated README for ${owner}/${repo}`);
       return { success: true, owner, repo };
     } catch (error) {
@@ -496,16 +499,20 @@ export const generateSingleReadme = inngest.createFunction(
         logger.warn(
           `Skipping ${owner}/${repo}: Access denied (private repository or insufficient permissions)`
         );
+        // Mark as completed with skipped status
+        await db.setRepoStatus(owner, repo, "completed", undefined, "readme");
         return { success: true, owner, repo, skipped: true, reason: "Access denied" };
       }
 
       // Check if it's a rate limit error
       if (errorMessage.includes("rate limit")) {
         logger.error(`Rate limit hit for ${owner}/${repo}`);
+        await db.setRepoStatus(owner, repo, "failed", errorMessage, "readme");
         throw error; // Re-throw to trigger Inngest retry
       }
 
       logger.error(`Failed to generate README for ${owner}/${repo}:`, error);
+      await db.setRepoStatus(owner, repo, "failed", errorMessage, "readme");
       throw error; // Re-throw to trigger Inngest retry
     }
   }
@@ -532,6 +539,14 @@ export const generateBatchReadmes = inngest.createFunction(
       } else if (forkFilter === "without-forks") {
         repos = repos.filter((repo) => !repo.isFork);
       }
+
+      // Filter out hidden repositories
+      const hiddenRepos = await db.getHiddenRepos();
+      const hiddenReposSet = new Set(hiddenRepos);
+      repos = repos.filter((repo) => {
+        const key = `${repo.owner.toLowerCase()}/${repo.repo.toLowerCase()}`;
+        return !hiddenReposSet.has(key);
+      });
 
       logger.info(`Found ${repos.length} repositories to process for README generation`);
 
@@ -567,112 +582,3 @@ export const generateBatchReadmes = inngest.createFunction(
     }
   }
 );
-
-/**
- * Helper function to generate README content
- */
-async function generateREADMEContent(repoData: any): Promise<string> {
-  const {
-    name,
-    description,
-    homepage,
-    topics = [],
-    language,
-    clone_url,
-    html_url,
-    owner,
-  } = repoData;
-
-  const hasHomepage = homepage && homepage.trim().length > 0;
-  const displayName = name
-    .split("-")
-    .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-
-  const readme = `# ${displayName}
-
-${description || `A GitHub repository for ${name}`}
-
-${hasHomepage ? `🌐 [Visit Project](${homepage})` : ""}
-
-## About
-
-${description || `This project provides functionality for managing and analyzing repository data.`} Whether you're looking to track your repositories, analyze their performance, or generate documentation, this tool is designed to help.
-
-## Features
-
-${
-  topics.length > 0
-    ? `- 🎯 ${topics.join("\n- 🎯 ")}`
-    : `- ✨ Repository management
-- 🚀 Automated workflows
-- 📊 Data analysis
-- 🔧 Easy configuration
-- 📝 Comprehensive documentation`
-}
-${language ? `- 🧠 Built with ${language}` : ""}
-
-## Getting Started
-
-### Prerequisites
-
-- Git
-- Node.js (v14 or higher) or your project's required runtime
-- Your system's package manager (npm, yarn, pnpm, or bun)
-
-### Installation
-
-1. Clone the repository:
-   \`\`\`bash
-   git clone ${clone_url}
-   cd ${name}
-   \`\`\`
-
-2. Install dependencies:
-   \`\`\`bash
-   npm install
-   # or
-   yarn install
-   \`\`\`
-
-3. Configure your environment:
-   Create a \`.env.local\` file with any required environment variables.
-
-4. Start the development server:
-   \`\`\`bash
-   npm run dev
-   # or
-   yarn dev
-   \`\`\`
-
-## Usage
-
-[Add usage examples and instructions here]
-
-## Contributing
-
-We welcome contributions! Please follow these steps:
-
-1. Fork the repository
-2. Create a feature branch (\`git checkout -b feature/AmazingFeature\`)
-3. Commit your changes (\`git commit -m 'Add some AmazingFeature'\`)
-4. Push to the branch (\`git push origin feature/AmazingFeature\`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Support
-
-For questions or issues, please open an issue on [GitHub Issues](${html_url}/issues).
-
----
-
-**Repository:** [${owner.login}/${name}](${html_url})
-
-Generated with ❤️
-`;
-
-  return readme;
-}

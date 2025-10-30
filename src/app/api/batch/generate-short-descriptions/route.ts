@@ -29,8 +29,17 @@ export async function POST(request: NextRequest) {
     // Fetch all repositories from database
     let allRepos = await db.getFetchedRepositories();
     
+    // Get hidden repositories
+    const hiddenRepos = await db.getHiddenRepos();
+    const hiddenReposSet = new Set(hiddenRepos);
+    
     // Apply filters
     const filteredRepos = allRepos.filter((repo) => {
+      const repoKey = `${repo.owner.toLowerCase()}/${repo.repo.toLowerCase()}`;
+      
+      // Filter out hidden repos
+      if (hiddenReposSet.has(repoKey)) return false;
+      
       // Apply fork filter
       if (forkFilter === "with-forks") {
         if (!repo.isFork) return false;

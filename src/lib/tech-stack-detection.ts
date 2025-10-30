@@ -244,18 +244,6 @@ export function groupTechStackByCategory(techStack: TechStack[]): Record<TechCat
 }
 
 /**
- * Gets a display-friendly label for a category
- */
-export function getCategoryLabel(category: TechCategory): string {
-  const labels: Record<TechCategory, string> = {
-    frontend: 'Frontend',
-    backend: 'Backend',
-    testing: 'Testing',
-  };
-  return labels[category];
-}
-
-/**
  * Gets a color for a category (useful for UI)
  */
 export function getCategoryColor(category: TechCategory): string {

@@ -3,7 +3,7 @@ import { DEFAULT_FILES, ProjectConfigEntry } from "@/config/projects";
 
 const GITHUB_API = "https://api.github.com";
 
-export type RepoDocument = {
+type RepoDocument = {
   path: string;
   content: string;
   url?: string;

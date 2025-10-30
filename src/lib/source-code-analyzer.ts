@@ -12,7 +12,7 @@
  * relying on often-missing or outdated documentation.
  */
 
-export type SourceCodeSummary = {
+type SourceCodeSummary = {
   mainLanguages: string[];
   projectStructure: string;
   keyFiles: string[];

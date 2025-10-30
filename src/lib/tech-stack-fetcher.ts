@@ -11,7 +11,7 @@ const GITHUB_API = "https://api.github.com";
 
 const decodeBase64 = (value: string) => Buffer.from(value, "base64").toString("utf-8");
 
-export interface PackageJsonData {
+interface PackageJsonData {
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
@@ -20,7 +20,7 @@ export interface PackageJsonData {
 /**
  * Fetches package.json from a GitHub repository
  */
-export async function fetchPackageJson(
+async function fetchPackageJson(
   owner: string,
   repo: string,
   branch?: string,
@@ -71,7 +71,7 @@ export async function fetchPackageJson(
 /**
  * Extracts tech stack information from a package.json
  */
-export function extractTechStack(packageJson: PackageJsonData): TechStackInfo {
+function extractTechStack(packageJson: PackageJsonData): TechStackInfo {
   const { dependencies, devDependencies, peerDependencies } = packageJson;
   
   const techStack = detectTechStack(dependencies, devDependencies, peerDependencies);

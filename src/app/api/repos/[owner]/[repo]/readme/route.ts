@@ -5,7 +5,7 @@ import { getAIModel, getLmStudioUrl } from "@/lib/env";
 
 export async function POST(
   _request: NextRequest,
-  { params }: { params: { owner: string; repo: string } }
+  context: { params: Promise<{ owner: string; repo: string }> }
 ) {
   const token = getGitHubToken();
   if (!token) {
@@ -16,7 +16,7 @@ export async function POST(
   }
 
   try {
-    const { owner, repo } = await params;
+    const { owner, repo } = await context.params;
 
     // Fetch repository details from GitHub
     const repoResponse = await fetch(

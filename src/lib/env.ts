@@ -10,4 +10,4 @@ export const getAIModel = () => process.env.AI_MODEL ?? "lmstudio-community/gemm
 
 export const getLmStudioUrl = () => process.env.LM_STUDIO_URL ?? "http://localhost:1234/v1";
 
-export const requireEnv = (key: string) => process.env[key] ?? throwMissing(key);
+const requireEnv = (key: string) => process.env[key] ?? throwMissing(key);

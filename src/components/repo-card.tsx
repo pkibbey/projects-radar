@@ -4,17 +4,16 @@ import Link from "next/link";
 import { useState } from "react";
 import type { RepositoryBundle } from "@/lib/github";
 import type { RepoAnalysis } from "@/lib/ai";
-import type { RepoStatusRecord } from "@/lib/db";
+import type { RepoStatusRecord, ProjectLearning } from "@/lib/db";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { HideRepoButton } from "@/components/hide-repo-button";
-import { LanguageIcon } from "@/components/language-icon";
 import { EditableText } from "@/components/editable-text";
 import { TechStackDisplay } from "@/components/tech-stack-display";
-import { OwnershipBadge } from "@/components/ownership-badge";
-import { InfoIcon } from "lucide-react";
 import { ExternalLinkButton } from "./external-link-button";
-import { Button } from "./ui/button";
+import { ShowInfoButton } from "./show-info-button";
+import { AddLearningButton } from "@/components/add-learning-button";
+import { LearningInsightsDisplay } from "@/components/learning-insights-display";
 
 type RepoCardProps = {
   bundle: RepositoryBundle;
@@ -22,6 +21,7 @@ type RepoCardProps = {
   hasData: boolean;
   id?: string;
   processingStatus?: RepoStatusRecord;
+  learning?: ProjectLearning | null;
 };
 
 export const RepoCard = ({
@@ -30,12 +30,16 @@ export const RepoCard = ({
   hasData,
   id,
   processingStatus,
+  learning,
 }: RepoCardProps) => {
   const { meta } = bundle;
   const [currentSummary, setCurrentSummary] = useState(analysis?.summary ?? "");
   const [currentAnalysis] = useState(analysis);
   const [isExpanded, setIsExpanded] = useState(false);
-
+  const [currentLearning, setCurrentLearning] = useState<ProjectLearning | null>(
+    learning ?? null
+  );
+    
   const showActions = hasData;
   const showTopics = hasData && meta.topics.length > 0;
   const showPackages = hasData && (currentAnalysis?.packages?.length ?? 0) > 0;
@@ -43,8 +47,6 @@ export const RepoCard = ({
 
   const cardSpacing = "gap-1 p-3";
   const descriptionTone = "text-sm";
-
-  const hasLanguage = hasData && meta.primaryLanguage;
 
   const summaryText =
     currentSummary ||
@@ -80,28 +82,25 @@ export const RepoCard = ({
         className="flex flex-wrap items-start justify-between gap-3"
       >
         <div className="space-y-1 w-full">
-          <div className="flex justify-between">
-            <h2 className="flex gap-2 text-xl font-semibold text-slate-900 dark:text-slate-100">
-              <Link href={`/repos/${meta.owner}/${meta.name}`}>
-                {meta.displayName}
-              </Link>
-              <ExternalLinkButton htmlUrl={meta.htmlUrl} />
-            </h2>
+          <div className="flex justify-between items-start gap-4">
+            <div className="flex flex-col gap-2">
+              <h2 className="flex gap-2 text-xl font-semibold text-slate-900 dark:text-slate-100">
+                <Link href={`/repos/${meta.owner}/${meta.name}`}>
+                  {meta.displayName}
+                </Link>
+                <ExternalLinkButton htmlUrl={meta.htmlUrl} />
+              </h2>
+            </div>
             <div className="flex items-center gap-2">
               {hasData && currentAnalysis?.techStack && (
                   <TechStackDisplay 
                     techStack={currentAnalysis.techStack}
                   />
               )}
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => setIsExpanded(!isExpanded)}
-                title={isExpanded ? "Hide info" : "Show info"}
-                className="h-7 w-7 rounded-full bg-slate-100/80 text-slate-500 hover:bg-orange-200 hover:text-orange-700 dark:bg-slate-800/80 dark:hover:bg-orange-700 dark:hover:text-orange-200 cursor-pointer border"
-              >
-                <InfoIcon className="h-4 w-4" />
-              </Button>
+              <ShowInfoButton 
+                isExpanded={isExpanded} 
+                onToggle={() => setIsExpanded(!isExpanded)} 
+              />
               <HideRepoButton owner={meta.owner} repo={meta.name} />
             </div>
           </div>
@@ -116,13 +115,6 @@ export const RepoCard = ({
               : "Generate data to pull the latest repository description and metadata from GitHub."}
           </p>
         </div>
-        <div className="flex flex-col gap-2">
-          <OwnershipBadge 
-            isFork={meta.isFork} 
-            isOwnedByUser={meta.isOwnedByUser ?? false}
-            ownerUsername={meta.ownerUsername}
-          />
-        </div>
       </header>
 
       {(showPackages ||
@@ -132,7 +124,7 @@ export const RepoCard = ({
       ) && (
         <>
           <section>
-            <div className="space-y-4">
+            <div className="space-y-4">           
               {showPackages && (
                 <div>
                   <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -169,7 +161,21 @@ export const RepoCard = ({
             </Badge>
           ))}
         </footer>
-      )}      
+      )}
+
+      {/* Learning Insights Section */}
+      <section className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800">
+        {currentLearning && (
+          <LearningInsightsDisplay learning={currentLearning} />
+        )}
+        <AddLearningButton
+          owner={meta.owner}
+          repo={meta.name}
+          initialData={currentLearning}
+          onSave={(data) => setCurrentLearning(data)}
+          onDelete={() => setCurrentLearning(null)}
+        />
+      </section>
 
       {isExpanded && (
         <div className="mt-4 overflow-auto rounded border border-slate-300 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950">

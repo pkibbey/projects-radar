@@ -7,7 +7,7 @@ import { getAIModel, getLmStudioUrl } from "@/lib/env";
 import type { TechStackInfo } from "@/lib/tech-stack-detection";
 import { analyzeSourceCodeStructure, formatSourceCodeContext } from "@/lib/source-code-analyzer";
 
-export type RepoInsight = {
+type RepoInsight = {
   title: string;
   description: string;
 };
@@ -168,7 +168,7 @@ export const generateRepoAnalysis = async (
   });
 
   if (providerHealth.status === "failed") {
-    return buildFallback(bundle, providerHealth.message ?? LM_STUDIO_FAILURE_MESSAGE);
+    throw new Error(providerHealth.message ?? LM_STUDIO_FAILURE_MESSAGE);
   }
 
   try {
@@ -237,14 +237,14 @@ ${prepareContext(bundle)}`;
         console.error("generateRepoAnalysis connection error", error);
         loggedProviderFailure = true;
       }
-      return buildFallback(bundle, LM_STUDIO_FAILURE_MESSAGE);
+      throw new Error(LM_STUDIO_FAILURE_MESSAGE);
     }
 
     console.error("generateRepoAnalysis error", error);
     if (error instanceof GitHubError) {
-      return buildFallback(bundle, error.message);
+      throw new Error(error.message);
     }
-    return buildFallback(bundle);
+    throw error;
   }
 };
 
@@ -262,7 +262,7 @@ export const generateShortDescription = async (
   });
 
   if (providerHealth.status === "failed") {
-    return bundle.meta.description || "No description available.";
+    throw new Error(providerHealth.message ?? LM_STUDIO_FAILURE_MESSAGE);
   }
 
   try {
@@ -290,7 +290,7 @@ ${prepareContext(bundle)}`;
 
     const text = response.output_text?.trim();
     if (!text) {
-      return bundle.meta.description || "No description available.";
+      throw new Error("AI returned empty response");
     }
 
     return text;
@@ -304,40 +304,23 @@ ${prepareContext(bundle)}`;
         console.error("generateShortDescription connection error", error);
         loggedProviderFailure = true;
       }
-      return bundle.meta.description || "No description available.";
+      throw new Error(LM_STUDIO_FAILURE_MESSAGE);
     }
 
     console.error("generateShortDescription error", error);
     if (error instanceof GitHubError) {
-      return error.message;
+      throw new Error(error.message);
     }
-    return bundle.meta.description || "No description available.";
+    throw error;
   }
 };
 
-export type PackageJsonEnhancement = {
-  description: string;
-  keywords: string[];
-  homepage?: string;
-  repository?: {
-    type: string;
-    url: string;
-  };
-  bugs?: {
-    url: string;
-  };
-  author?: string;
-};
-
 /**
- * Analyze package.json and generate enhanced metadata using AI
+ * Generate a comprehensive README for a repository using AI
  */
-export const enhancePackageJson = async (
-  packageJson: Record<string, unknown>,
-  repoOwner: string,
-  repoName: string,
-  readmeContent?: string,
-): Promise<PackageJsonEnhancement> => {
+export const generateReadmeContent = async (
+  bundle: RepositoryBundle,
+): Promise<string> => {
   const model = getAIModel();
 
   const client = new OpenAI({
@@ -350,70 +333,54 @@ export const enhancePackageJson = async (
   }
 
   try {
-    const context = `
-Repository: ${repoOwner}/${repoName}
-Current package.json name: ${packageJson.name || 'unknown'}
-Current description: ${packageJson.description || 'none'}
-Current keywords: ${JSON.stringify(packageJson.keywords || [])}
-Dependencies: ${JSON.stringify(packageJson.dependencies || {})}
-DevDependencies: ${JSON.stringify(packageJson.devDependencies || {})}
-${readmeContent ? `\nREADME excerpt:\n${readmeContent.slice(0, 1000)}` : ''}
-`.trim();
+    const input = `You are an expert technical writer specializing in creating comprehensive README files. Analyze this repository and generate a professional, well-structured README.md file.
 
-    const input = `You are a package.json metadata expert. Analyze this Node.js project and generate appropriate metadata. Respond with JSON using the shape {"description": string, "keywords": string[], "homepage": string, "repository": {"type": "git", "url": string}, "bugs": {"url": string}, "author": string}. 
+The README should include:
+1. Clear title and description
+2. Features and highlights based on the actual codebase
+3. Getting started / installation instructions
+4. Usage examples
+5. Technology stack
+6. Contributing guidelines
+7. License information
 
-Guidelines:
-- description: 1-2 sentence project description (max 200 chars), clear and professional
-- keywords: 5-15 relevant keywords for npm/package discovery (lowercase, no duplicates)
-- homepage: GitHub repository URL (https://github.com/${repoOwner}/${repoName})
-- repository: Standard GitHub repository object
-- bugs: GitHub issues URL
-- author: If not present, can be inferred or set to "${repoOwner}"
+Format the response as a valid markdown file ready to be committed to GitHub. Make it informative, professional, and specific to the project based on the code analysis.
 
-Context:
-${context}`;
+Repository context:
+${prepareContext(bundle)}`;
 
     const response = await client.responses.create({
       model,
       input,
-      max_output_tokens: 500,
+      max_output_tokens: 2000,
     });
 
     providerHealth = { status: "ready" };
+    loggedProviderFailure = false;
 
-    const text = response.output_text;
+    const text = response.output_text?.trim();
     if (!text) {
       throw new Error("AI returned empty response");
     }
 
-    const jsonPayload = extractJson(text);
-    const parsed = JSON.parse(jsonPayload) as PackageJsonEnhancement;
-
-    // Validate and provide defaults
-    return {
-      description: parsed.description || `A Node.js project by ${repoOwner}`,
-      keywords: Array.isArray(parsed.keywords) ? parsed.keywords : [],
-      homepage: parsed.homepage || `https://github.com/${repoOwner}/${repoName}`,
-      repository: parsed.repository || {
-        type: "git",
-        url: `https://github.com/${repoOwner}/${repoName}.git`,
-      },
-      bugs: parsed.bugs || {
-        url: `https://github.com/${repoOwner}/${repoName}/issues`,
-      },
-      author: parsed.author,
-    };
+    return text;
   } catch (error) {
     if (isConnectionError(error)) {
       providerHealth = {
         status: "failed",
         message: LM_STUDIO_FAILURE_MESSAGE,
       };
-      console.error("enhancePackageJson connection error", error);
+      if (!loggedProviderFailure) {
+        console.error("generateReadmeContent connection error", error);
+        loggedProviderFailure = true;
+      }
       throw new Error(LM_STUDIO_FAILURE_MESSAGE);
     }
 
-    console.error("enhancePackageJson error", error);
+    console.error("generateReadmeContent error", error);
+    if (error instanceof GitHubError) {
+      throw new Error(error.message);
+    }
     throw error;
   }
 };

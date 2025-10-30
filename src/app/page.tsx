@@ -30,6 +30,7 @@ type ProjectRow = {
   hasData: boolean;
   updatedAt?: string | null;
   processingStatus?: RepoStatusRecord | null;
+  learning?: any;
 };
 
 const buildPlaceholderBundle = (entry: GitHubUserRepo): RepositoryBundle => ({
@@ -74,6 +75,10 @@ async function DashboardContent({ sortMode, sortOrder, dataFilter, forkFilter, r
   const records = await db.listRepoData();
   const recordMap = new Map(records.map((record) => [record.key, record]));
 
+  // Fetch all learnings
+  const allLearnings = await db.listProjectLearnings();
+  const learningMap = new Map(allLearnings.map((learning) => [learning.key, learning]));
+
   // Fetch hidden repos
   const hiddenRepos = await db.getHiddenRepos();
   const hiddenReposSet = new Set(hiddenRepos);
@@ -90,12 +95,35 @@ async function DashboardContent({ sortMode, sortOrder, dataFilter, forkFilter, r
         hasData: Boolean(record),
         updatedAt: record?.updatedAt ?? null,
         processingStatus: null, // Will be fetched separately
+        learning: learningMap.get(keyForEntry(entry)) ?? null,
       } satisfies ProjectRow;
     });
 
   // Fetch processing status for all repos
   const statusRecords = await db.getReposByStatuses(["pending", "processing", "completed", "failed"]);
-  const statusMap = new Map(statusRecords.map((record) => [record.key, record]));
+  
+  // Create a map of aggregated statuses (worst status for each repo)
+  const statusMap = new Map<string, RepoStatusRecord>();
+  const statusPriority: Record<string, number> = {
+    'processing': 3,
+    'pending': 2,
+    'failed': 1,
+    'completed': 0,
+  };
+  
+  // Aggregate statuses by repo key, keeping the worst status
+  for (const record of statusRecords) {
+    const existing = statusMap.get(record.key);
+    if (!existing) {
+      statusMap.set(record.key, record);
+    } else {
+      const currentPriority = statusPriority[record.status] ?? -1;
+      const existingPriority = statusPriority[existing.status] ?? -1;
+      if (currentPriority > existingPriority) {
+        statusMap.set(record.key, record);
+      }
+    }
+  }
 
   // Update projects with their processing status
   const projectsWithStatus = projects.map((project) => ({
@@ -225,6 +253,7 @@ async function DashboardContent({ sortMode, sortOrder, dataFilter, forkFilter, r
               hasData={project.hasData}
               id={`${project.bundle.meta.owner}-${project.bundle.meta.name}`}
               processingStatus={project.processingStatus ?? undefined}
+              learning={project.learning ?? null}
             />
           ))}
         </div>
