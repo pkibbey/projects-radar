@@ -59,6 +59,8 @@ export const QUEUE_NAMES = {
   GENERATE_BATCH_SHORT_DESCRIPTIONS: "generate-batch-short-descriptions",
   GENERATE_SINGLE_README: "generate-single-readme",
   GENERATE_BATCH_READMES: "generate-batch-readmes",
+  GENERATE_SINGLE_SCREENSHOT: "generate-single-screenshot",
+  GENERATE_BATCH_SCREENSHOTS: "generate-batch-screenshots",
 } as const;
 
 // Type definitions for job data
@@ -110,7 +112,18 @@ export interface GenerateSingleReadmeJobData {
   token: string;
 }
 
+export interface GenerateSingleScreenshotJobData {
+  owner: string;
+  repo: string;
+  token: string;
+}
+
 export interface GenerateBatchReadmesJobData {
+  token: string;
+  forkFilter?: "all" | "with-forks" | "without-forks";
+}
+
+export interface GenerateBatchScreenshotsJobData {
   token: string;
   forkFilter?: "all" | "with-forks" | "without-forks";
 }

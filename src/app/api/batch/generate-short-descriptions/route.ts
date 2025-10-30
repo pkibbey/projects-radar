@@ -26,12 +26,16 @@ export async function POST(request: NextRequest) {
       // If body parsing fails, use defaults
     }
 
+    console.log(`[Batch Short Description API] Received request with forkFilter: ${forkFilter}`);
+
     // Fetch all repositories from database
     let allRepos = await db.getFetchedRepositories();
+    console.log(`[Batch Short Description API] Fetched ${allRepos.length} total repositories from database`);
 
     // Get hidden repositories
     const hiddenRepos = await db.getHiddenRepos();
     const hiddenReposSet = new Set(hiddenRepos);
+    console.log(`[Batch Short Description API] Found ${hiddenRepos.length} hidden repositories`);
 
     // Apply filters
     const filteredRepos = allRepos.filter((repo) => {
@@ -50,18 +54,26 @@ export async function POST(request: NextRequest) {
       return true;
     });
 
+    console.log(`[Batch Short Description API] After filtering: ${filteredRepos.length} repositories to process`);
+
     // Queue batch short description generation job with BullMQ
     const queue = await getQueue(QUEUE_NAMES.GENERATE_BATCH_SHORT_DESCRIPTIONS);
-    await queue.add("batch", {
+    console.log(`[Batch Short Description API] Got queue instance: ${QUEUE_NAMES.GENERATE_BATCH_SHORT_DESCRIPTIONS}`);
+    
+    const job = await queue.add("batch", {
       token,
       forkFilter,
     });
+
+    console.log(`[Batch Short Description API] Successfully queued batch job ID: ${job.id} for ${filteredRepos.length} repositories`);
 
     return new Response(
       JSON.stringify({
         ok: true,
         message:
           `Batch short description generation has been queued for ${filteredRepos.length} repositories. Check back in a few moments for results.`,
+        jobId: job.id,
+        repoCount: filteredRepos.length,
       }),
       { status: 202, headers: { "Content-Type": "application/json" } }
     );

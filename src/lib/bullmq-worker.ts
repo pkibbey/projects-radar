@@ -17,6 +17,7 @@ import {
   analyzeCopilotWithContext,
   generateQuickCopilotAnalysis,
 } from "@/lib/copilot-analyzer";
+import { generateRepositoryScreenshot } from "@/lib/screenshot-generator";
 import type { Job } from "bullmq";
 
 const workerConfig = {
@@ -720,6 +721,100 @@ async function startWorkers() {
         return summary;
       } catch (error) {
         console.error(`[${QUEUE_NAMES.GENERATE_BATCH_READMES}] Failed:`, error);
+        throw error;
+      }
+    },
+    workerConfig
+  );
+
+  // Worker for single screenshot generation
+  new Worker(
+    QUEUE_NAMES.GENERATE_SINGLE_SCREENSHOT,
+    async (job: Job) => {
+      const { owner, repo, token } = job.data as {
+        owner: string;
+        repo: string;
+        token: string;
+      };
+
+      console.log(`[${QUEUE_NAMES.GENERATE_SINGLE_SCREENSHOT}] Processing: ${owner}/${repo}`);
+
+      try {
+        await generateRepositoryScreenshot(owner, repo, token);
+
+        console.log(`[${QUEUE_NAMES.GENERATE_SINGLE_SCREENSHOT}] Completed: ${owner}/${repo}`);
+        return { success: true, key: `${owner}/${repo}` };
+      } catch (error) {
+        console.error(
+          `[${QUEUE_NAMES.GENERATE_SINGLE_SCREENSHOT}] Failed for ${owner}/${repo}:`,
+          error
+        );
+        throw error;
+      }
+    },
+    workerConfig
+  );
+
+  // Worker for batch screenshots
+  new Worker(
+    QUEUE_NAMES.GENERATE_BATCH_SCREENSHOTS,
+    async (job: Job) => {
+      const { token, forkFilter = "all" } = job.data as {
+        token: string;
+        forkFilter?: "all" | "with-forks" | "without-forks";
+      };
+
+      console.log(
+        `[${QUEUE_NAMES.GENERATE_BATCH_SCREENSHOTS}] Starting batch`
+      );
+
+      try {
+        let repos = await db.getFetchedRepositories();
+
+        if (forkFilter === "with-forks") {
+          repos = repos.filter((repo) => repo.isFork);
+        } else if (forkFilter === "without-forks") {
+          repos = repos.filter((repo) => !repo.isFork);
+        }
+
+        const hiddenRepos = await db.getHiddenRepos();
+        const hiddenReposSet = new Set(hiddenRepos);
+        repos = repos.filter((repo) => {
+          const key = `${repo.owner.toLowerCase()}/${repo.repo.toLowerCase()}`;
+          return !hiddenReposSet.has(key);
+        });
+
+        console.log(
+          `[${QUEUE_NAMES.GENERATE_BATCH_SCREENSHOTS}] Processing ${repos.length} repos`
+        );
+
+        if (repos.length === 0) {
+          return { queued: 0, failed: 0 };
+        }
+
+        const singleQueue = await getQueue(QUEUE_NAMES.GENERATE_SINGLE_SCREENSHOT);
+        const results = await Promise.allSettled(
+          repos.map((entry) => {
+            return singleQueue.add("generate", {
+              owner: entry.owner,
+              repo: entry.repo,
+              token,
+            });
+          })
+        );
+
+        const summary = {
+          queued: results.filter((r) => r.status === "fulfilled").length,
+          failed: results.filter((r) => r.status === "rejected").length,
+        };
+
+        console.log(
+          `[${QUEUE_NAMES.GENERATE_BATCH_SCREENSHOTS}] Batch initiated:`,
+          summary
+        );
+        return summary;
+      } catch (error) {
+        console.error(`[${QUEUE_NAMES.GENERATE_BATCH_SCREENSHOTS}] Failed:`, error);
         throw error;
       }
     },

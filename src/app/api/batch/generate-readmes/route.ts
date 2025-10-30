@@ -26,12 +26,16 @@ export async function POST(request: NextRequest) {
       // If body parsing fails, use defaults
     }
 
+    console.log(`[Batch README API] Received request with forkFilter: ${forkFilter}`);
+
     // Fetch all repositories from database
     let allRepos = await db.getFetchedRepositories();
+    console.log(`[Batch README API] Fetched ${allRepos.length} total repositories from database`);
 
     // Get hidden repositories
     const hiddenRepos = await db.getHiddenRepos();
     const hiddenReposSet = new Set(hiddenRepos);
+    console.log(`[Batch README API] Found ${hiddenRepos.length} hidden repositories`);
 
     // Apply filters
     const filteredRepos = allRepos.filter((repo) => {
@@ -50,18 +54,26 @@ export async function POST(request: NextRequest) {
       return true;
     });
 
+    console.log(`[Batch README API] After filtering: ${filteredRepos.length} repositories to process`);
+
     // Queue batch README generation job with BullMQ
     const queue = await getQueue(QUEUE_NAMES.GENERATE_BATCH_READMES);
-    await queue.add("batch", {
+    console.log(`[Batch README API] Got queue instance: ${QUEUE_NAMES.GENERATE_BATCH_READMES}`);
+    
+    const job = await queue.add("batch", {
       token,
       forkFilter,
     });
+
+    console.log(`[Batch README API] Successfully queued batch job ID: ${job.id} for ${filteredRepos.length} repositories`);
 
     return new Response(
       JSON.stringify({
         ok: true,
         message:
           `Batch README generation has been queued for ${filteredRepos.length} repositories. Check back in a few moments for results.`,
+        jobId: job.id,
+        repoCount: filteredRepos.length,
       }),
       { status: 202, headers: { "Content-Type": "application/json" } }
     );

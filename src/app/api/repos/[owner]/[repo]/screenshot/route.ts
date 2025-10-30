@@ -4,24 +4,24 @@ import { getQueue, QUEUE_NAMES } from "@/lib/bullmq";
 
 export async function POST(
   _request: NextRequest,
-  context: { params: Promise<{ owner: string; repo: string }> }
+  { params }: { params: Promise<{ owner: string; repo: string }> }
 ) {
   const token = getGitHubToken();
   if (!token) {
     return new Response(
-      JSON.stringify({ error: "GITHUB_TOKEN is required" }),
+      JSON.stringify({ error: "GITHUB_TOKEN is required to generate screenshots." }),
       { status: 400, headers: { "Content-Type": "application/json" } }
     );
   }
 
   try {
-    const { owner, repo } = await context.params;
+    const { owner, repo } = await params;
 
-    console.log(`[README API] Received request to queue README generation for ${owner}/${repo}`);
+    console.log(`[Screenshot API] Received request to queue screenshot generation for ${owner}/${repo}`);
 
-    // Queue single README generation job
-    const queue = await getQueue(QUEUE_NAMES.GENERATE_SINGLE_README);
-    console.log(`[README API] Got queue instance: ${QUEUE_NAMES.GENERATE_SINGLE_README}`);
+    // Queue single screenshot generation job
+    const queue = await getQueue(QUEUE_NAMES.GENERATE_SINGLE_SCREENSHOT);
+    console.log(`[Screenshot API] Got queue instance: ${QUEUE_NAMES.GENERATE_SINGLE_SCREENSHOT}`);
     
     const job = await queue.add("generate", {
       owner,
@@ -29,18 +29,18 @@ export async function POST(
       token,
     });
 
-    console.log(`[README API] Successfully queued job ID: ${job.id} for ${owner}/${repo}`);
+    console.log(`[Screenshot API] Successfully queued job ID: ${job.id} for ${owner}/${repo}`);
 
     return new Response(
       JSON.stringify({
         ok: true,
-        message: `README generation queued for ${owner}/${repo}.`,
+        message: `Screenshot generation queued for ${owner}/${repo}.`,
         jobId: job.id,
       }),
       { status: 202, headers: { "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Failed to queue README generation:", error);
+    console.error("Failed to queue screenshot generation:", error);
     return new Response(
       JSON.stringify({
         error: error instanceof Error ? error.message : "Unknown error",

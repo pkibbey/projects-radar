@@ -14,6 +14,9 @@ import { ExternalLinkButton } from "./external-link-button";
 import { ShowInfoButton } from "./show-info-button";
 import { AddLearningButton } from "@/components/add-learning-button";
 import { LearningInsightsDisplay } from "@/components/learning-insights-display";
+import { SingleScreenshotButton } from "@/components/single-screenshot-button";
+import { SingleReadmeButton } from "@/components/single-readme-button";
+import { SingleShortDescriptionButton } from "@/components/single-short-description-button";
 
 type RepoCardProps = {
   bundle: RepositoryBundle;
@@ -97,6 +100,9 @@ export const RepoCard = ({
                     techStack={currentAnalysis.techStack}
                   />
               )}
+              <SingleShortDescriptionButton owner={meta.owner} repo={meta.name} />
+              <SingleScreenshotButton owner={meta.owner} repo={meta.name} />
+              <SingleReadmeButton owner={meta.owner} repo={meta.name} />
               <ShowInfoButton 
                 isExpanded={isExpanded} 
                 onToggle={() => setIsExpanded(!isExpanded)} 

@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { type GitHubUserRepo } from "@/lib/github-user-repos";
 import { getGitHubOwner } from "@/lib/env";
 import db from "@/lib/db";
@@ -20,6 +21,7 @@ import { RefreshRepositoriesButton } from "@/components/refresh-repositories-but
 import { UnhideAllReposButton } from "@/components/unhide-all-repos-button";
 import { BatchGenerateShortDescriptionsButton } from "@/components/batch-generate-short-descriptions-button";
 import { BatchGenerateReadmesButton } from "@/components/batch-generate-readmes-button";
+import { BatchGenerateScreenshotsButton } from "@/components/batch-generate-screenshots-button";
 
 export const dynamic = "force-dynamic";
 
@@ -303,18 +305,20 @@ export default async function Home({ searchParams }: HomeProps) {
               Set `GITHUB_TOKEN` to increase rate limits and access private repositories.
             </p>
           )}
+          <Link href="/queue-status" className="inline-block text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+            📊 View Queue Status
+          </Link>
         </div>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-6">
+        <div className="flex flex-wrap flex-col gap-x-4 gap-y-2 sm:flex-row sm:items-end">
           <SortSelector value={sortMode} />
           <OrderSelector order={sortOrder} />
           <ForkFilterSelector value={forkFilter} />
-        </div>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-6">
           <RefreshRepositoriesButton />
           <UnhideAllReposButton forkFilter={forkFilter} repos={fetchedRepos} />
           <BatchGenerateButton dataFilter={dataFilter} forkFilter={forkFilter} repos={fetchedRepos} />
           <BatchGenerateShortDescriptionsButton dataFilter={dataFilter} forkFilter={forkFilter} repos={fetchedRepos} />
           <BatchGenerateReadmesButton dataFilter={dataFilter} forkFilter={forkFilter} repos={fetchedRepos} />
+          <BatchGenerateScreenshotsButton dataFilter={dataFilter} forkFilter={forkFilter} repos={fetchedRepos} />
         </div>
       </header>
 

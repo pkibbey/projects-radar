@@ -2,23 +2,23 @@
 
 import { useCallback, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Zap } from "lucide-react";
+import { Loader2, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DataFilter } from "@/lib/data-filters";
 import type { ForkFilter } from "@/lib/fork-filters";
 import type { GitHubUserRepo } from "@/lib/github-user-repos";
 
-type BatchGenerateShortDescriptionsButtonProps = {
+type BatchGenerateScreenshotsButtonProps = {
   dataFilter?: DataFilter;
   forkFilter?: ForkFilter;
   repos?: GitHubUserRepo[];
 };
 
-export const BatchGenerateShortDescriptionsButton = ({
+export const BatchGenerateScreenshotsButton = ({
   dataFilter = "all",
   forkFilter = "all",
   repos = [],
-}: BatchGenerateShortDescriptionsButtonProps) => {
+}: BatchGenerateScreenshotsButtonProps) => {
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">(
     "idle"
@@ -86,7 +86,7 @@ export const BatchGenerateShortDescriptionsButton = ({
     setMessage(null);
 
     try {
-      const response = await fetch("/api/batch/generate-short-descriptions", {
+      const response = await fetch("/api/batch/generate-screenshots", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -110,13 +110,13 @@ export const BatchGenerateShortDescriptionsButton = ({
       }
 
       if (!response.ok) {
-        throw new Error(payload.error ?? `Failed to start batch generation. Status: ${response.status}`);
+        throw new Error(payload.error ?? `Failed to start batch screenshot generation. Status: ${response.status}`);
       }
 
       setStatus("success");
       setMessage(
         payload.message ??
-        `Queued ${filteredCount} repositories for short description generation. Check back in a few moments!`
+        `Queued ${filteredCount} ${filteredCount === 1 ? "repository" : "repositories"} for screenshot generation. Check back in a few moments!`
       );
       
       // Refresh after a short delay to allow some processing
@@ -128,7 +128,7 @@ export const BatchGenerateShortDescriptionsButton = ({
       setMessage(
         error instanceof Error
           ? error.message
-          : "Unable to queue short description generation. Check server logs for details."
+          : "Unable to queue screenshot generation. Check server logs for details."
       );
     } finally {
       setTimeout(() => {
@@ -150,17 +150,17 @@ export const BatchGenerateShortDescriptionsButton = ({
         variant="default"
         size="sm"
         disabled={status === "loading"}
-        aria-label="Generate short descriptions for repositories"
+        aria-label="Generate screenshots for repositories"
         className="rounded-full cursor-pointer"
       >
         {status === "loading" ? (
           <Loader2 className="h-4 w-4 animate-spin" />
         ) : (
-          <Zap className="h-4 w-4" />
+          <Camera className="h-4 w-4" />
         )}
         {status === "loading"
           ? "Queuing…"
-          : `Generate ${filteredCount} Description${filteredCount === 1 ? "" : "s"}`}
+          : `Generate ${filteredCount} Screenshot${filteredCount === 1 ? "" : "s"}`}
       </Button>
       {message && (
         <p className="max-w-xs text-xs text-slate-500 dark:text-slate-400">

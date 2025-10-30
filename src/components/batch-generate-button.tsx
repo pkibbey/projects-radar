@@ -148,7 +148,7 @@ export const BatchGenerateButton = ({
         type="button"
         onClick={handleClick}
         variant="default"
-        size="default"
+        size="sm"
         disabled={status === "loading"}
         aria-label="Generate summaries for remaining repositories"
         className="rounded-full cursor-pointer"
