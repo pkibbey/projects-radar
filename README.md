@@ -1,65 +1,79 @@
-## Project overview
+# Projects Dashboard
 
-Project Radar is a Next.js dashboard that aggregates GitHub repositories, highlights project health signals, and produces AI generated insights and guided action plans. Each repository card surfaces:
+A GitHub repository for projects-dashboard
 
-- live metadata (forks, open issues, recent activity)
-- AI summaries and observations derived from root documentation files (README, PROJECT_ANALYSIS, TODO)
-- actionable checklists you can copy into your workflow
 
-## Prerequisites
 
-- Node.js 18.18 or later
-- npm 9 or later (ships with Node)
-- A GitHub personal access token (required for Copilot analysis)
-- GitHub Copilot CLI (`gh copilot`) installed and authenticated
-- *(Alternative)* A local LM Studio instance exposing an OpenAI-compatible server
+## About
 
-## Quick start
+This project provides functionality for managing and analyzing repository data. Whether you're looking to track your repositories, analyze their performance, or generate documentation, this tool is designed to help.
 
-1. Install dependencies:
+## Features
 
-	```bash
-	npm install
-	```
+- ✨ Repository management
+- 🚀 Automated workflows
+- 📊 Data analysis
+- 🔧 Easy configuration
+- 📝 Comprehensive documentation
+- 🧠 Built with TypeScript
 
-2. Copy the environment template and update values:
+## Getting Started
 
-        ```bash
-        cp .env.local.example .env.local
-        ```
+### Prerequisites
 
-        - `GITHUB_TOKEN` (required for Copilot): enables repository cloning, higher rate limits, access to private repositories, and Copilot CLI analysis. Generate a token with `repo` scope at https://github.com/settings/tokens
-        - `AI_MODEL` (optional): override the default model served by LM Studio.
-        - `LM_STUDIO_URL` (optional): override the base URL for LM Studio. Defaults to `http://localhost:1234/v1`.3. Define the repositories you want to monitor by editing `src/config/projects.ts`.
+- Git
+- Node.js (v14 or higher) or your project's required runtime
+- Your system's package manager (npm, yarn, pnpm, or bun)
 
-4. Launch the development server:
+### Installation
 
-	```bash
-	npm run dev
-	```
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/pkibbey/projects-dashboard.git
+   cd projects-dashboard
+   ```
 
-5. Open [http://localhost:3000](http://localhost:3000) to explore the dashboard.
+2. Install dependencies:
+   ```bash
+   npm install
+   # or
+   yarn install
+   ```
 
-## Configuration
+3. Configure your environment:
+   Create a `.env.local` file with any required environment variables.
 
-- Repository list: edit `projectConfig` inside `src/config/projects.ts`. Each entry accepts `owner`, `repo`, optional `branch`, and optional `displayName`.
-- Documentation files: by default the dashboard looks for `README.md`, `PROJECT_ANALYSIS.md`, `TODO.md`, and `PROJECT.md` in the repository root. Update `DEFAULT_FILES` in the same file to customize.
-- AI Analysis: The dashboard now uses **GitHub Copilot CLI** to generate AI insights by analyzing the full repository context (code structure, dependencies, patterns). To enable:
-  1. Install the GitHub CLI: `brew install gh` (macOS) or see https://cli.github.com
-  2. Install Copilot extension: `gh extension install github/gh-copilot`
-  3. Authenticate: `gh auth login` and ensure you have Copilot access
-  4. Set `GITHUB_TOKEN` in `.env.local` for repository cloning
-- Alternative AI provider: LM Studio is still supported as a fallback. Ensure LM Studio exposes an OpenAI-compatible server (default `http://localhost:1234/v1`). Override `AI_MODEL` or `LM_STUDIO_URL` as needed.
+4. Start the development server:
+   ```bash
+   npm run dev
+   # or
+   yarn dev
+   ```
 
-## Available scripts
+## Usage
 
-```bash
-npm run dev     # start the Next.js dev server
-npm run build   # build production assets
-npm run start   # start the production server
-npm run lint    # run ESLint
-```
+[Add usage examples and instructions here]
 
-## Deployment notes
+## Contributing
 
-The app is a standard Next.js App Router project. Deploy to Vercel or any Node-capable platform. Remember to configure the environment variables in your hosting provider so GitHub integration and LM Studio connectivity continue to function.
+We welcome contributions! Please follow these steps:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Support
+
+For questions or issues, please open an issue on [GitHub Issues](https://github.com/pkibbey/projects-dashboard/issues).
+
+---
+
+**Repository:** [pkibbey/projects-dashboard](https://github.com/pkibbey/projects-dashboard)
+
+Generated with ❤️
