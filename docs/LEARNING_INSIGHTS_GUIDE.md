@@ -18,7 +18,7 @@ What problem were you trying to solve? Why did this project matter to you?
 How did you structure the project? What tech decisions did you make and why?
 
 **Example:**
-> "I used Next.js 16 for the frontend with React 19, built a SQLite database for caching, and integrated Inngest for background task processing. I chose this stack to experiment with modern React patterns and serverless workflows."
+> "I used Next.js 16 for the frontend with React 19, built a SQLite database for caching, and integrated bullmq for background task processing. I chose this stack to experiment with modern React patterns and serverless workflows."
 
 ### 3. **Skills & Technologies** (The "Tools")
 Tag the technologies and skills you used and gained experience with.

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getGitHubToken } from "@/lib/env";
-import { inngest } from "@/lib/inngest";
+import { getQueue, QUEUE_NAMES } from "@/lib/bullmq";
 import { isForkFilter, type ForkFilter } from "@/lib/fork-filters";
 import db from "@/lib/db";
 
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
   try {
     // Parse request body for filters
     let forkFilter: ForkFilter = "all";
-    
+
     try {
       const body = await request.json();
       if (isForkFilter(body.forkFilter)) {
@@ -28,18 +28,18 @@ export async function POST(request: NextRequest) {
 
     // Fetch all repositories from database
     let allRepos = await db.getFetchedRepositories();
-    
+
     // Get hidden repositories
     const hiddenRepos = await db.getHiddenRepos();
     const hiddenReposSet = new Set(hiddenRepos);
-    
+
     // Apply filters
     const filteredRepos = allRepos.filter((repo) => {
       const repoKey = `${repo.owner.toLowerCase()}/${repo.repo.toLowerCase()}`;
-      
+
       // Filter out hidden repos
       if (hiddenReposSet.has(repoKey)) return false;
-      
+
       // Apply fork filter
       if (forkFilter === "with-forks") {
         if (!repo.isFork) return false;
@@ -50,13 +50,11 @@ export async function POST(request: NextRequest) {
       return true;
     });
 
-    // Send event to Inngest to process batch
-    await inngest.send({
-      name: "repo/generate-batch-readmes",
-      data: {
-        token,
-        forkFilter, // Pass fork filter to Inngest function
-      },
+    // Queue batch README generation job with BullMQ
+    const queue = await getQueue(QUEUE_NAMES.GENERATE_BATCH_READMES);
+    await queue.add("batch", {
+      token,
+      forkFilter,
     });
 
     return new Response(

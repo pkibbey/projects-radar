@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getGitHubOwner, getGitHubToken } from "@/lib/env";
-import { inngest } from "@/lib/inngest";
+import { getQueue, QUEUE_NAMES } from "@/lib/bullmq";
 import { fetchUserRepositories } from "@/lib/github-user-repos";
 import { isForkFilter, type ForkFilter } from "@/lib/fork-filters";
 
@@ -15,10 +15,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const owner = getGitHubOwner();
-    
+
     // Parse request body for filters
     let forkFilter: ForkFilter = "all";
-    
+
     try {
       const body = await request.json();
       if (isForkFilter(body.forkFilter)) {
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch all repositories
     const allRepos = await fetchUserRepositories(owner, token);
-    
+
     // Apply filters
     const filteredRepos = allRepos.filter((repo) => {
       // Apply fork filter
@@ -43,14 +43,12 @@ export async function POST(request: NextRequest) {
       return true;
     });
 
-    // Send event to Inngest to process batch
-    await inngest.send({
-      name: "repo/process-batch",
-      data: {
-        owner,
-        token,
-        forkFilter, // Pass fork filter to Inngest function
-      },
+    // Queue batch processing job with BullMQ
+    const queue = await getQueue(QUEUE_NAMES.PROCESS_BATCH_REPOSITORIES);
+    await queue.add("batch", {
+      owner,
+      token,
+      forkFilter,
     });
 
     return new Response(

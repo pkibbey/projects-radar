@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getGitHubToken } from "@/lib/env";
 import db from "@/lib/db";
-import { inngest } from "@/lib/inngest";
+import { getQueue, QUEUE_NAMES } from "@/lib/bullmq";
 import { GitHubError } from "@/lib/github";
 
 export async function GET(
@@ -57,16 +57,14 @@ export async function POST(
   const useCopilot = url.searchParams.get('useCopilot') === 'true';
 
   try {
-    // Queue the data processing with Inngest
-    await inngest.send({
-      name: "repo/process-data",
-      data: {
-        owner,
-        repo,
-        token,
-        useCopilot,
-        useLmStudio,
-      },
+    // Queue the data processing job with BullMQ
+    const queue = await getQueue(QUEUE_NAMES.PROCESS_REPOSITORY_DATA);
+    await queue.add("process", {
+      owner,
+      repo,
+      token,
+      useCopilot,
+      useLmStudio,
     });
 
     return new Response(

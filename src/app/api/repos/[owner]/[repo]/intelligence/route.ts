@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getGitHubToken } from "@/lib/env";
 import db from "@/lib/db";
-import { inngest } from "@/lib/inngest";
+import { getQueue, QUEUE_NAMES } from "@/lib/bullmq";
 
 export async function POST(
   _request: NextRequest,
@@ -18,14 +18,12 @@ export async function POST(
   }
 
   try {
-    // Queue the refresh with Inngest
-    await inngest.send({
-      name: "repo/refresh-intelligence",
-      data: {
-        owner,
-        repo,
-        token,
-      },
+    // Queue the refresh with BullMQ
+    const queue = await getQueue(QUEUE_NAMES.REFRESH_REPOSITORY_INTELLIGENCE);
+    await queue.add("refresh", {
+      owner,
+      repo,
+      token,
     });
 
     return new Response(

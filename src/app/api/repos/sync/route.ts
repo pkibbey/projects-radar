@@ -1,5 +1,5 @@
 import { getGitHubOwner, getGitHubToken } from "@/lib/env";
-import { inngest } from "@/lib/inngest";
+import { getQueue, QUEUE_NAMES } from "@/lib/bullmq";
 
 export const POST = async () => {
   try {
@@ -13,13 +13,11 @@ export const POST = async () => {
       );
     }
 
-    // Queue the sync with Inngest
-    await inngest.send({
-      name: "repos/sync",
-      data: {
-        owner,
-        token,
-      },
+    // Queue the sync with BullMQ
+    const queue = await getQueue(QUEUE_NAMES.SYNC_REPOSITORIES_FROM_GITHUB);
+    await queue.add("sync", {
+      owner,
+      token,
     });
 
     return Response.json(
