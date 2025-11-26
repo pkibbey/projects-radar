@@ -309,7 +309,7 @@ export default async function Home({ searchParams }: HomeProps) {
             📊 View Queue Status
           </Link>
         </div>
-        <div className="flex flex-wrap flex-col gap-x-4 gap-y-2 sm:flex-row sm:items-end">
+        <div className="flex flex-wrap flex-col gap-4 sm:flex-row sm:items-end">
           <SortSelector value={sortMode} />
           <OrderSelector order={sortOrder} />
           <ForkFilterSelector value={forkFilter} />

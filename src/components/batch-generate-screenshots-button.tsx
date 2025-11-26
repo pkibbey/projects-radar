@@ -2,7 +2,7 @@
 
 import { useCallback, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Camera } from "lucide-react";
+import { Loader2, Camera, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DataFilter } from "@/lib/data-filters";
 import type { ForkFilter } from "@/lib/fork-filters";
@@ -23,7 +23,6 @@ export const BatchGenerateScreenshotsButton = ({
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">(
     "idle"
   );
-  const [message, setMessage] = useState<string | null>(null);
   const [filteredCount, setFilteredCount] = useState(0);
 
   // Calculate which repos match the current filters
@@ -83,7 +82,6 @@ export const BatchGenerateScreenshotsButton = ({
     }
 
     setStatus("loading");
-    setMessage(null);
 
     try {
       const response = await fetch("/api/batch/generate-screenshots", {
@@ -114,10 +112,6 @@ export const BatchGenerateScreenshotsButton = ({
       }
 
       setStatus("success");
-      setMessage(
-        payload.message ??
-        `Queued ${filteredCount} ${filteredCount === 1 ? "repository" : "repositories"} for screenshot generation. Check back in a few moments!`
-      );
       
       // Refresh after a short delay to allow some processing
       setTimeout(() => {
@@ -125,7 +119,7 @@ export const BatchGenerateScreenshotsButton = ({
       }, 3000);
     } catch (error) {
       setStatus("error");
-      setMessage(
+      console.error(
         error instanceof Error
           ? error.message
           : "Unable to queue screenshot generation. Check server logs for details."
@@ -133,8 +127,7 @@ export const BatchGenerateScreenshotsButton = ({
     } finally {
       setTimeout(() => {
         setStatus("idle");
-        setMessage(null);
-      }, 5000);
+      }, 2000);
     }
   }, [status, filteredCount, dataFilter, forkFilter, router]);
 
@@ -149,24 +142,23 @@ export const BatchGenerateScreenshotsButton = ({
         onClick={handleClick}
         variant="default"
         size="sm"
-        disabled={status === "loading"}
+        disabled={status === "loading" || status === "success"}
         aria-label="Generate screenshots for repositories"
         className="rounded-full cursor-pointer"
       >
         {status === "loading" ? (
           <Loader2 className="h-4 w-4 animate-spin" />
+        ) : status === "success" ? (
+          <Check className="h-4 w-4 text-green-600" />
         ) : (
           <Camera className="h-4 w-4" />
         )}
         {status === "loading"
           ? "Queuing…"
+          : status === "success"
+          ? ""
           : `Generate ${filteredCount} Screenshot${filteredCount === 1 ? "" : "s"}`}
       </Button>
-      {message && (
-        <p className="max-w-xs text-xs text-slate-500 dark:text-slate-400">
-          {message}
-        </p>
-      )}
     </div>
   );
 };

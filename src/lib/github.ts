@@ -37,6 +37,7 @@ export type RepositoryBundle = {
     archived: boolean;
     ownerUsername?: string;
     isOwnedByUser?: boolean;
+    screenshotUrl?: string;
   };
   documents: RepoDocument[];
 };
@@ -233,6 +234,22 @@ export const fetchRepositoryBundle = async (
 
   const completenessScore = computeCompletenessScore(repoData, documents);
 
+  // Check if SCREENSHOT.png exists
+  let screenshotUrl: string | undefined;
+  const screenshotResponse = await fetch(
+    `${GITHUB_API}/repos/${owner}/${repo}/contents/SCREENSHOT.png${branch ? `?ref=${branch}` : ""}`,
+    {
+      headers,
+      next: { revalidate: 300 },
+    },
+  );
+  
+  console.log('screenshotResponse: ', screenshotResponse);
+  if (screenshotResponse.ok) {
+    // Construct the raw GitHub URL for the screenshot
+    screenshotUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch || repoData.default_branch}/SCREENSHOT.png`;
+  }
+
   return {
     meta: {
       owner,
@@ -255,6 +272,7 @@ export const fetchRepositoryBundle = async (
       isPrivate: Boolean(repoData.private),
       isFork: Boolean(repoData.fork),
       archived: Boolean(repoData.archived),
+      screenshotUrl,
     },
     documents,
   };

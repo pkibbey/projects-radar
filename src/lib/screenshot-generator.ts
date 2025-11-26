@@ -26,6 +26,7 @@ export async function generateRepositoryScreenshot(
   let clonedRepoPath: string | null = null;
   let devProcess: any = null;
   let browser: Browser | null = null;
+  let port: number | null = null;
   
   try {
     // Create temp directory
@@ -46,7 +47,7 @@ export async function generateRepositoryScreenshot(
     if (!packageJsonExists) {
       throw new Error(`No package.json found in ${owner}/${repo} - not a Node.js project`);
     }
-    
+
     // Install dependencies
     console.log(`[Screenshot] Installing dependencies for ${owner}/${repo}...`);
     await execAsync('npm install', {
@@ -54,9 +55,11 @@ export async function generateRepositoryScreenshot(
       maxBuffer: 1024 * 1024 * 10,
       timeout: 300000, // 5 minutes
     });
+
+    // Allocate a random, unique port (range 10000-60000 to avoid conflicts)
+    port = Math.floor(Math.random() * 50000) + 10000;
+    console.log(`[Screenshot] Allocated port ${port} for ${owner}/${repo}`);
     
-    // Try to detect the dev server port (default to 3000)
-    let port = 3000;
     const nextConfigPath = path.join(clonedRepoPath, 'next.config.ts');
     const nextConfigJsPath = path.join(clonedRepoPath, 'next.config.js');
     
@@ -64,24 +67,33 @@ export async function generateRepositoryScreenshot(
     const isNextJs = await fileExists(nextConfigPath) || await fileExists(nextConfigJsPath);
     
     if (!isNextJs) {
-      // Try to detect from package.json
+      // Try to detect from package.json for other frameworks
       const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf-8'));
       if (packageJson.scripts?.dev?.includes(':3001')) {
         port = 3001;
       } else if (packageJson.scripts?.dev?.includes(':5173')) {
         port = 5173; // Vite
+      } else if (packageJson.scripts?.dev?.includes(':3000')) {
+        port = 3000;
       }
     }
     
-    // Start dev server
+    // Start dev server with explicit port for Next.js or environment variable for others
     console.log(`[Screenshot] Starting dev server for ${owner}/${repo} on port ${port}...`);
+    
+    const envVars = { 
+      ...process.env,
+      PORT: port.toString(),
+    };
+    
     devProcess = spawn('npm', ['run', 'dev'], {
       cwd: clonedRepoPath,
+      env: envVars,
       stdio: 'ignore', // Suppress output
     });
     
-    // Wait for server to start
-    await waitForServer(`http://localhost:${port}`, 60000); // 60 second timeout
+    // Wait for server to start with increased timeout and better health checking
+    await waitForServer(`http://localhost:${port}`, 90000, owner, repo); // 90 second timeout
     
     // Launch browser and take screenshot
     console.log(`[Screenshot] Taking screenshot of ${owner}/${repo}...`);
@@ -201,28 +213,49 @@ async function updateReadmeWithScreenshot(repoPath: string): Promise<void> {
 }
 
 /**
- * Wait for a server to be ready
+ * Wait for a server to be ready with better health checking
  * @param url URL to check
  * @param timeout Maximum time to wait in milliseconds
+ * @param owner Repository owner (for logging)
+ * @param repo Repository name (for logging)
  */
-async function waitForServer(url: string, timeout: number): Promise<void> {
+async function waitForServer(url: string, timeout: number, owner: string, repo: string): Promise<void> {
   const startTime = Date.now();
+  let lastError: Error | null = null;
   
   while (Date.now() - startTime < timeout) {
     try {
-      const response = await fetch(url, { method: 'HEAD' });
-      if (response.ok || response.status === 304) {
-        console.log(`[Screenshot] Server is ready at ${url}`);
+      const response = await fetch(url, { 
+        method: 'GET',
+        signal: AbortSignal.timeout(5000) // 5 second fetch timeout
+      });
+      
+      // Accept any 2xx or 3xx status (page loaded or redirect)
+      if (response.status >= 200 && response.status < 400) {
+        console.log(`[Screenshot] Server is ready at ${url} (status: ${response.status})`);
+        return;
+      }
+      
+      // If we get 4xx/5xx, the server is running but there's an app error
+      // This is still "ready" from a server perspective
+      if (response.status >= 400) {
+        console.log(`[Screenshot] Server responded with status ${response.status} at ${url}, continuing...`);
         return;
       }
     } catch (error) {
-      // Server not ready yet
+      lastError = error instanceof Error ? error : new Error(String(error));
+      // Server not ready yet, will retry
     }
     
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
   }
   
-  throw new Error(`Server did not start at ${url} within ${timeout}ms`);
+  const elapsed = Math.round((Date.now() - startTime) / 1000);
+  console.error(`[Screenshot] Server did not start at ${url} within ${elapsed}s for ${owner}/${repo}`);
+  if (lastError) {
+    console.error(`[Screenshot] Last error: ${lastError.message}`);
+  }
+  throw new Error(`Server did not start at ${url} within ${timeout}ms for ${owner}/${repo}`);
 }
 
 /**

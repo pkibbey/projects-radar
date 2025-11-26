@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 import type { RepositoryBundle } from "@/lib/github";
 import type { RepoAnalysis } from "@/lib/ai";
@@ -17,6 +18,7 @@ import { LearningInsightsDisplay } from "@/components/learning-insights-display"
 import { SingleScreenshotButton } from "@/components/single-screenshot-button";
 import { SingleReadmeButton } from "@/components/single-readme-button";
 import { SingleShortDescriptionButton } from "@/components/single-short-description-button";
+import { LanguageIcon } from "@/components/language-icon";
 
 type RepoCardProps = {
   bundle: RepositoryBundle;
@@ -110,18 +112,36 @@ export const RepoCard = ({
               <HideRepoButton owner={meta.owner} repo={meta.name} />
             </div>
           </div>
-          <p
-            className={cn(
-              "max-w-2xl text-slate-600 dark:text-slate-300",
-              descriptionTone,
+          <div className="flex items-start gap-2">
+            {meta.primaryLanguage && (
+              <LanguageIcon language={meta.primaryLanguage} className="h-4 w-4 mt-0.5 flex-shrink-0" />
             )}
-          >
-            {hasData
-              ? meta.description ?? "No description provided."
-              : "Generate data to pull the latest repository description and metadata from GitHub."}
-          </p>
+            <p
+              className={cn(
+                "max-w-2xl text-slate-600 dark:text-slate-300",
+                descriptionTone,
+              )}
+            >
+              {hasData
+                ? meta.description ?? "No description provided."
+                : "Generate data to pull the latest repository description and metadata from GitHub."}
+            </p>
+          </div>
         </div>
       </header>
+
+      {meta.screenshotUrl && (
+        <div className="mt-3 rounded border border-slate-200 overflow-hidden bg-slate-50 dark:border-slate-700 dark:bg-slate-950">
+          <Image 
+            src={meta.screenshotUrl} 
+            alt={`${meta.displayName} screenshot`}
+            width={600}
+            height={400}
+            className="w-full h-auto object-cover max-h-48"
+            unoptimized
+          />
+        </div>
+      )}
 
       {(showPackages ||
         (isExpanded && summaryText) ||
