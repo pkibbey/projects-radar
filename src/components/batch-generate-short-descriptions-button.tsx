@@ -4,19 +4,13 @@ import { useCallback, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { DataFilter } from "@/lib/data-filters";
-import type { ForkFilter } from "@/lib/fork-filters";
 import type { GitHubUserRepo } from "@/lib/github-user-repos";
 
 type BatchGenerateShortDescriptionsButtonProps = {
-  dataFilter?: DataFilter;
-  forkFilter?: ForkFilter;
   repos?: GitHubUserRepo[];
 };
 
 export const BatchGenerateShortDescriptionsButton = ({
-  dataFilter = "all",
-  forkFilter = "all",
   repos = [],
 }: BatchGenerateShortDescriptionsButtonProps) => {
   const router = useRouter();
@@ -29,40 +23,20 @@ export const BatchGenerateShortDescriptionsButton = ({
   // Calculate which repos match the current filters
   const calculateFilteredCount = useCallback(async () => {
     try {
-      // Fetch hidden repos and data
-      const [visibilityResponse, analyticsResponse] = await Promise.all([
-        fetch("/api/repos/visibility"),
-        fetch("/api/analytics/tech-stack"),
-      ]);
-      
+      // Fetch hidden repos
+      const visibilityResponse = await fetch("/api/repos/visibility");
+
       const visibilityData = await visibilityResponse.json();
-      const analyticsData = await analyticsResponse.json();
-      
+
       const hiddenReposSet = new Set(visibilityData.hidden || []);
-      const reposWithData = new Set((analyticsData.repos || []).map((r: any) => `${r.owner.toLowerCase()}/${r.repo.toLowerCase()}`));
-      
+
       // Get repos that match all filters
       const reposToProcess = repos.filter((repo) => {
         const repoKey = `${repo.owner.toLowerCase()}/${repo.repo.toLowerCase()}`;
-        
+
         // Filter out hidden repos
         if (hiddenReposSet.has(repoKey)) return false;
-        
-        // Apply data filter
-        if (dataFilter === "with-data") {
-          if (!reposWithData.has(repoKey)) return false;
-        }
-        if (dataFilter === "without-data") {
-          if (reposWithData.has(repoKey)) return false;
-        }
-        
-        // Apply fork filter
-        if (forkFilter === "with-forks") {
-          if (!repo.isFork) return false;
-        }
-        if (forkFilter === "without-forks") {
-          if (repo.isFork) return false;
-        }
+
         return true;
       });
       return reposToProcess.length;
@@ -70,7 +44,7 @@ export const BatchGenerateShortDescriptionsButton = ({
       console.error("Failed to calculate filtered count:", e);
       return 0;
     }
-  }, [dataFilter, forkFilter, repos]);
+  }, [repos]);
 
   // Update filtered count when dependencies change
   useEffect(() => {
@@ -91,10 +65,7 @@ export const BatchGenerateShortDescriptionsButton = ({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          dataFilter,
-          forkFilter,
-        }),
+        body: JSON.stringify({}),
       });
 
       let payload: {
@@ -102,7 +73,7 @@ export const BatchGenerateShortDescriptionsButton = ({
         message?: string;
         error?: string;
       } = {};
-      
+
       try {
         payload = await response.json();
       } catch (e) {
@@ -118,7 +89,7 @@ export const BatchGenerateShortDescriptionsButton = ({
         payload.message ??
         `Queued ${filteredCount} repositories for short description generation. Check back in a few moments!`
       );
-      
+
       // Refresh after a short delay to allow some processing
       setTimeout(() => {
         router.refresh();
@@ -136,7 +107,7 @@ export const BatchGenerateShortDescriptionsButton = ({
         setMessage(null);
       }, 5000);
     }
-  }, [status, filteredCount, dataFilter, forkFilter, router]);
+  }, [status, filteredCount, router]);
 
   if (filteredCount === 0) {
     return null;

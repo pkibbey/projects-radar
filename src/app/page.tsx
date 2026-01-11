@@ -8,17 +8,11 @@ import type { RepoAnalysis } from "@/lib/ai";
 import type { RepoStatusRecord } from "@/lib/db";
 import { RepoCard } from "@/components/repo-card";
 import { SortSelector, type SortKey, type SortOrder } from "@/components/sort-selector";
-import {
-  DEFAULT_DATA_FILTER,
-  isDataFilter,
-  type DataFilter,
-} from "@/lib/data-filters";
-import { DEFAULT_FORK_FILTER, isForkFilter, type ForkFilter } from "@/lib/fork-filters";
+import { DEFAULT_VISIBILITY_FILTER, isVisibilityFilter, type VisibilityFilter } from "@/lib/visibility-filters";
 import { OrderSelector } from "@/components/order-selector";
-import { ForkFilterSelector } from "@/components/fork-filter-selector";
+import { VisibilityFilterSelector } from "@/components/visibility-filter-selector";
 import { BatchGenerateButton } from "@/components/batch-generate-button";
 import { RefreshRepositoriesButton } from "@/components/refresh-repositories-button";
-import { UnhideAllReposButton } from "@/components/unhide-all-repos-button";
 import { BatchGenerateShortDescriptionsButton } from "@/components/batch-generate-short-descriptions-button";
 import { BatchGenerateReadmesButton } from "@/components/batch-generate-readmes-button";
 import { BatchGenerateScreenshotsButton } from "@/components/batch-generate-screenshots-button";
@@ -52,7 +46,7 @@ const buildPlaceholderBundle = (entry: GitHubUserRepo): RepositoryBundle => ({
     topics: [],
     hasDiscussions: false,
     watchers: 0,
-    isPrivate: false,
+    isPrivate: entry.isPrivate,
     isFork: entry.isFork,
     archived: false,
     license: null,
@@ -67,13 +61,12 @@ const keyForEntry = (entry: GitHubUserRepo) => `${entry.owner.toLowerCase()}/${e
 type DashboardContentProps = {
   sortMode: SortKey;
   sortOrder: SortOrder;
-  dataFilter: DataFilter;
-  forkFilter: ForkFilter;
+  visibilityFilter: VisibilityFilter;
   repos?: GitHubUserRepo[];
   owner?: string;
 };
 
-async function DashboardContent({ sortMode, sortOrder, dataFilter, forkFilter, repos = [], owner = "" }: DashboardContentProps) {
+async function DashboardContent({ sortMode, sortOrder, visibilityFilter, repos = [], owner = "" }: DashboardContentProps) {
   const records = await db.listRepoData();
   const recordMap = new Map(records.map((record) => [record.key, record]));
 
@@ -101,9 +94,10 @@ async function DashboardContent({ sortMode, sortOrder, dataFilter, forkFilter, r
       } satisfies ProjectRow;
     });
 
+
   // Fetch processing status for all repos
   const statusRecords = await db.getReposByStatuses(["pending", "processing", "completed", "failed"]);
-  
+
   // Create a map of aggregated statuses (worst status for each repo)
   const statusMap = new Map<string, RepoStatusRecord>();
   const statusPriority: Record<string, number> = {
@@ -112,7 +106,7 @@ async function DashboardContent({ sortMode, sortOrder, dataFilter, forkFilter, r
     'failed': 1,
     'completed': 0,
   };
-  
+
   // Aggregate statuses by repo key, keeping the worst status
   for (const record of statusRecords) {
     const existing = statusMap.get(record.key);
@@ -144,20 +138,12 @@ async function DashboardContent({ sortMode, sortOrder, dataFilter, forkFilter, r
   }
 
   const filteredProjects = projectsWithStatus.filter((project) => {
-    // Apply data filter
-    if (dataFilter === "with-data") {
-      if (!project.hasData) return false;
+    // Apply visibility filter
+    if (visibilityFilter === "public-only") {
+      if (project.bundle.meta.isPrivate) return false;
     }
-    if (dataFilter === "without-data") {
-      if (project.hasData) return false;
-    }
-
-    // Apply fork filter
-    if (forkFilter === "with-forks") {
-      if (!project.entry.isFork) return false;
-    }
-    if (forkFilter === "without-forks") {
-      if (project.entry.isFork) return false;
+    if (visibilityFilter === "private-only") {
+      if (!project.bundle.meta.isPrivate) return false;
     }
 
     return true;
@@ -165,7 +151,7 @@ async function DashboardContent({ sortMode, sortOrder, dataFilter, forkFilter, r
 
   const sortedProjects = filteredProjects.slice().sort((a, b) => {
     let compareResult = 0;
-    
+
     if (sortMode === "updated") {
       compareResult = new Date(b.bundle.meta.pushedAt).getTime() - new Date(a.bundle.meta.pushedAt).getTime();
     } else if (sortMode === "completeness") {
@@ -175,7 +161,7 @@ async function DashboardContent({ sortMode, sortOrder, dataFilter, forkFilter, r
     } else {
       compareResult = a.bundle.meta.displayName.localeCompare(b.bundle.meta.displayName);
     }
-    
+
     return sortOrder === "desc" ? -compareResult : compareResult;
   });
 
@@ -210,7 +196,6 @@ async function DashboardContent({ sortMode, sortOrder, dataFilter, forkFilter, r
   const extraLanguageCount = aggregateStats.languages.size - topLanguages.length;
   const selectedCount = aggregateStats.selectedCount;
   const totalProjects = projectsWithStatus.length;
-  const showingAllProjects = dataFilter === "all";
 
   // Count repos by processing status
   const processingCount = projectsWithStatus.filter((p) => p.processingStatus?.status === "processing").length;
@@ -221,9 +206,7 @@ async function DashboardContent({ sortMode, sortOrder, dataFilter, forkFilter, r
     <div className="flex flex-col gap-6">
       <section className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
         <span className="font-medium text-slate-600 dark:text-slate-200">
-          {showingAllProjects
-            ? `${totalProjects} repositories from ${owner}`
-            : `Showing ${filteredProjects.length} of ${totalProjects} repositories from ${owner}`}
+          {`${filteredProjects.length} repositories showing from ${owner}`}
         </span>
         {selectedCount > 0 && <span>📦 {selectedCount} selected</span>}
         {processingCount > 0 && <span>⚙️ {processingCount} analyzing</span>}
@@ -269,23 +252,19 @@ type HomeProps = {
 };
 
 export default async function Home({ searchParams }: HomeProps) {
-  const resolvedParams = searchParams ? await searchParams : {};  
+  const resolvedParams = searchParams ? await searchParams : {};
   const rawSort = Array.isArray(resolvedParams.sort) ? resolvedParams.sort[0] : resolvedParams.sort;
-  const rawDataFilter = Array.isArray(resolvedParams.data)
-    ? resolvedParams.data[0]
-    : resolvedParams.data;
   const rawOrder = Array.isArray(resolvedParams.order) ? resolvedParams.order[0] : resolvedParams.order;
-  const rawForkFilter = Array.isArray(resolvedParams.fork)
-    ? resolvedParams.fork[0]
-    : resolvedParams.fork;
-  
+  const rawVisibilityFilter = Array.isArray(resolvedParams.visibility)
+    ? resolvedParams.visibility[0]
+    : resolvedParams.visibility;
+
   const sortMode: SortKey = rawSort === "updated" || rawSort === "completeness" ? rawSort : "name";
-  const dataFilter = isDataFilter(rawDataFilter) ? rawDataFilter : DEFAULT_DATA_FILTER;
-  const forkFilter = isForkFilter(rawForkFilter) ? rawForkFilter : DEFAULT_FORK_FILTER;
+  const visibilityFilter = isVisibilityFilter(rawVisibilityFilter) ? rawVisibilityFilter : DEFAULT_VISIBILITY_FILTER;
   const sortOrder: SortOrder = rawOrder === "desc" ? "desc" : "asc";
 
   const owner = getGitHubOwner();
-  
+
   // Load the repository list that was fetched via the button
   const fetchedRepos = await db.getFetchedRepositories();
 
@@ -293,10 +272,9 @@ export default async function Home({ searchParams }: HomeProps) {
     <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-10 px-6 py-12">
       <header className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
-          <p className="text-sm font-medium text-indigo-500">Project Radar</p>
-          <h1 className="text-3xl font-semibold text-slate-900 dark:text-slate-100">
+          <h3 className="text-3xl font-medium text-indigo-500">
             GitHub Project Intelligence
-          </h1>
+          </h3>
           <p className="max-w-3xl text-sm text-slate-600 dark:text-slate-300">
             Monitor repository health, review AI powered insights, and take guided actions to keep your projects on track.
           </p>
@@ -312,18 +290,17 @@ export default async function Home({ searchParams }: HomeProps) {
         <div className="flex flex-wrap flex-col gap-4 sm:flex-row sm:items-end">
           <SortSelector value={sortMode} />
           <OrderSelector order={sortOrder} />
-          <ForkFilterSelector value={forkFilter} />
+          <VisibilityFilterSelector value={visibilityFilter} />
           <RefreshRepositoriesButton />
-          <UnhideAllReposButton forkFilter={forkFilter} repos={fetchedRepos} />
-          <BatchGenerateButton dataFilter={dataFilter} forkFilter={forkFilter} repos={fetchedRepos} />
-          <BatchGenerateShortDescriptionsButton dataFilter={dataFilter} forkFilter={forkFilter} repos={fetchedRepos} />
-          <BatchGenerateReadmesButton dataFilter={dataFilter} forkFilter={forkFilter} repos={fetchedRepos} />
-          <BatchGenerateScreenshotsButton dataFilter={dataFilter} forkFilter={forkFilter} repos={fetchedRepos} />
+          <BatchGenerateButton repos={fetchedRepos} />
+          <BatchGenerateShortDescriptionsButton repos={fetchedRepos} />
+          <BatchGenerateReadmesButton repos={fetchedRepos} />
+          <BatchGenerateScreenshotsButton repos={fetchedRepos} />
         </div>
       </header>
 
       <Suspense fallback={<p className="text-sm text-slate-500">Loading repositories…</p>}>
-        <DashboardContent sortMode={sortMode} sortOrder={sortOrder} dataFilter={dataFilter} forkFilter={forkFilter} repos={fetchedRepos} owner={owner} />
+        <DashboardContent sortMode={sortMode} sortOrder={sortOrder} visibilityFilter={visibilityFilter} repos={fetchedRepos} owner={owner} />
       </Suspense>
     </div>
   );

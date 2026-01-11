@@ -8,31 +8,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FORK_FILTER_OPTIONS, getForkFilterLabel, type ForkFilter } from "@/lib/fork-filters";
+import { VISIBILITY_FILTER_OPTIONS, getVisibilityFilterLabel, type VisibilityFilter } from "@/lib/visibility-filters";
 
-type ForkFilterSelectorProps = {
-  value: ForkFilter;
+type VisibilityFilterSelectorProps = {
+  value: VisibilityFilter;
 };
 
-export const ForkFilterSelector = ({ value }: ForkFilterSelectorProps) => {
+export const VisibilityFilterSelector = ({ value }: VisibilityFilterSelectorProps) => {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const handleChange = (newFilter: ForkFilter) => {
+  const handleChange = (newFilter: VisibilityFilter) => {
     const params = new URLSearchParams(searchParams);
-    params.set("fork", newFilter);
+    params.set("visibility", newFilter);
     router.push(`?${params.toString()}`);
   };
 
   return (
-    <Select value={value} onValueChange={(val) => handleChange(val as ForkFilter)}>
+    <Select value={value} onValueChange={(val) => handleChange(val as VisibilityFilter)}>
       <SelectTrigger className="w-44">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {FORK_FILTER_OPTIONS.map((option) => (
+        {VISIBILITY_FILTER_OPTIONS.map((option) => (
           <SelectItem key={option} value={option}>
-            {getForkFilterLabel(option as ForkFilter)}
+            {getVisibilityFilterLabel(option as VisibilityFilter)}
           </SelectItem>
         ))}
       </SelectContent>

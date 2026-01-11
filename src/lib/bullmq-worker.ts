@@ -130,10 +130,9 @@ async function startWorkers() {
   new Worker(
     QUEUE_NAMES.PROCESS_BATCH_REPOSITORIES,
     async (job: Job) => {
-      const { owner, token, forkFilter = "all" } = job.data as {
+      const { owner, token } = job.data as {
         owner: string;
         token: string;
-        forkFilter?: "all" | "with-forks" | "without-forks";
       };
 
       console.log(
@@ -142,12 +141,6 @@ async function startWorkers() {
 
       try {
         let repos = await fetchUserRepositories(owner, token);
-
-        if (forkFilter === "with-forks") {
-          repos = repos.filter((repo) => repo.isFork);
-        } else if (forkFilter === "without-forks") {
-          repos = repos.filter((repo) => !repo.isFork);
-        }
 
         console.log(
           `[${QUEUE_NAMES.PROCESS_BATCH_REPOSITORIES}] Found ${repos.length} repositories`
@@ -481,9 +474,8 @@ async function startWorkers() {
   new Worker(
     QUEUE_NAMES.GENERATE_BATCH_SHORT_DESCRIPTIONS,
     async (job: Job) => {
-      const { token, forkFilter = "all" } = job.data as {
+      const { token } = job.data as {
         token: string;
-        forkFilter?: "all" | "with-forks" | "without-forks";
       };
 
       console.log(
@@ -492,12 +484,6 @@ async function startWorkers() {
 
       try {
         let repos = await db.getFetchedRepositories();
-
-        if (forkFilter === "with-forks") {
-          repos = repos.filter((repo) => repo.isFork);
-        } else if (forkFilter === "without-forks") {
-          repos = repos.filter((repo) => !repo.isFork);
-        }
 
         const hiddenRepos = await db.getHiddenRepos();
         const hiddenReposSet = new Set(hiddenRepos);
@@ -565,7 +551,7 @@ async function startWorkers() {
 
         // Create a temporary entry object for fetchRepositoryBundle
         const bundleEntry = { owner, repo } as { owner: string; repo: string };
-        const bundle = await fetchRepositoryBundle(bundleEntry, token);        console.log(`[${QUEUE_NAMES.GENERATE_SINGLE_README}] Analyzing ${owner}/${repo}`);
+        const bundle = await fetchRepositoryBundle(bundleEntry, token); console.log(`[${QUEUE_NAMES.GENERATE_SINGLE_README}] Analyzing ${owner}/${repo}`);
         const readmeContent = await generateReadmeContent(bundle);
 
         let sha: string | undefined;
@@ -667,21 +653,14 @@ async function startWorkers() {
   new Worker(
     QUEUE_NAMES.GENERATE_BATCH_READMES,
     async (job: Job) => {
-      const { token, forkFilter = "all" } = job.data as {
+      const { token } = job.data as {
         token: string;
-        forkFilter?: "all" | "with-forks" | "without-forks";
       };
 
       console.log(`[${QUEUE_NAMES.GENERATE_BATCH_READMES}] Starting batch`);
 
       try {
         let repos = await db.getFetchedRepositories();
-
-        if (forkFilter === "with-forks") {
-          repos = repos.filter((repo) => repo.isFork);
-        } else if (forkFilter === "without-forks") {
-          repos = repos.filter((repo) => !repo.isFork);
-        }
 
         const hiddenRepos = await db.getHiddenRepos();
         const hiddenReposSet = new Set(hiddenRepos);
@@ -759,9 +738,8 @@ async function startWorkers() {
   new Worker(
     QUEUE_NAMES.GENERATE_BATCH_SCREENSHOTS,
     async (job: Job) => {
-      const { token, forkFilter = "all" } = job.data as {
+      const { token } = job.data as {
         token: string;
-        forkFilter?: "all" | "with-forks" | "without-forks";
       };
 
       console.log(
@@ -770,12 +748,6 @@ async function startWorkers() {
 
       try {
         let repos = await db.getFetchedRepositories();
-
-        if (forkFilter === "with-forks") {
-          repos = repos.filter((repo) => repo.isFork);
-        } else if (forkFilter === "without-forks") {
-          repos = repos.filter((repo) => !repo.isFork);
-        }
 
         const hiddenRepos = await db.getHiddenRepos();
         const hiddenReposSet = new Set(hiddenRepos);

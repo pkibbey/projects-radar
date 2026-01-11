@@ -2,7 +2,6 @@ import { NextRequest } from "next/server";
 import { getGitHubOwner, getGitHubToken } from "@/lib/env";
 import { getQueue, QUEUE_NAMES } from "@/lib/bullmq";
 import { fetchUserRepositories } from "@/lib/github-user-repos";
-import { isForkFilter, type ForkFilter } from "@/lib/fork-filters";
 
 export async function POST(request: NextRequest) {
   const token = getGitHubToken();
@@ -18,45 +17,28 @@ export async function POST(request: NextRequest) {
     console.log(`[Batch Process API] Received request to process repositories for owner: ${owner}`);
 
     // Parse request body for filters
-    let forkFilter: ForkFilter = "all";
-
     try {
       const body = await request.json();
-      if (isForkFilter(body.forkFilter)) {
-        forkFilter = body.forkFilter;
-      }
     } catch (e) {
       // If body parsing fails, use defaults
     }
-
-    console.log(`[Batch Process API] Using forkFilter: ${forkFilter}`);
 
     // Fetch all repositories
     const allRepos = await fetchUserRepositories(owner, token);
     console.log(`[Batch Process API] Fetched ${allRepos.length} total repositories from GitHub`);
 
-    // Apply filters
-    const filteredRepos = allRepos.filter((repo) => {
-      // Apply fork filter
-      if (forkFilter === "with-forks") {
-        if (!repo.isFork) return false;
-      }
-      if (forkFilter === "without-forks") {
-        if (repo.isFork) return false;
-      }
-      return true;
-    });
+    // No filtering applied - processing all repositories
+    const filteredRepos = allRepos;
 
     console.log(`[Batch Process API] After filtering: ${filteredRepos.length} repositories to process`);
 
     // Queue batch processing job with BullMQ
     const queue = await getQueue(QUEUE_NAMES.PROCESS_BATCH_REPOSITORIES);
     console.log(`[Batch Process API] Got queue instance: ${QUEUE_NAMES.PROCESS_BATCH_REPOSITORIES}`);
-    
+
     const job = await queue.add("batch", {
       owner,
       token,
-      forkFilter,
     });
 
     console.log(`[Batch Process API] Successfully queued batch job ID: ${job.id} for ${filteredRepos.length} repositories`);

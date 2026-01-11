@@ -4,19 +4,13 @@ import { useCallback, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Camera, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { DataFilter } from "@/lib/data-filters";
-import type { ForkFilter } from "@/lib/fork-filters";
 import type { GitHubUserRepo } from "@/lib/github-user-repos";
 
 type BatchGenerateScreenshotsButtonProps = {
-  dataFilter?: DataFilter;
-  forkFilter?: ForkFilter;
   repos?: GitHubUserRepo[];
 };
 
 export const BatchGenerateScreenshotsButton = ({
-  dataFilter = "all",
-  forkFilter = "all",
   repos = [],
 }: BatchGenerateScreenshotsButtonProps) => {
   const router = useRouter();
@@ -28,40 +22,20 @@ export const BatchGenerateScreenshotsButton = ({
   // Calculate which repos match the current filters
   const calculateFilteredCount = useCallback(async () => {
     try {
-      // Fetch hidden repos and data
-      const [visibilityResponse, analyticsResponse] = await Promise.all([
-        fetch("/api/repos/visibility"),
-        fetch("/api/analytics/tech-stack"),
-      ]);
-      
+      // Fetch hidden repos
+      const visibilityResponse = await fetch("/api/repos/visibility");
+
       const visibilityData = await visibilityResponse.json();
-      const analyticsData = await analyticsResponse.json();
-      
+
       const hiddenReposSet = new Set(visibilityData.hidden || []);
-      const reposWithData = new Set((analyticsData.repos || []).map((r: any) => `${r.owner.toLowerCase()}/${r.repo.toLowerCase()}`));
-      
+
       // Get repos that match all filters
       const reposToProcess = repos.filter((repo) => {
         const repoKey = `${repo.owner.toLowerCase()}/${repo.repo.toLowerCase()}`;
-        
+
         // Filter out hidden repos
         if (hiddenReposSet.has(repoKey)) return false;
-        
-        // Apply data filter
-        if (dataFilter === "with-data") {
-          if (!reposWithData.has(repoKey)) return false;
-        }
-        if (dataFilter === "without-data") {
-          if (reposWithData.has(repoKey)) return false;
-        }
-        
-        // Apply fork filter
-        if (forkFilter === "with-forks") {
-          if (!repo.isFork) return false;
-        }
-        if (forkFilter === "without-forks") {
-          if (repo.isFork) return false;
-        }
+
         return true;
       });
       return reposToProcess.length;
@@ -69,7 +43,7 @@ export const BatchGenerateScreenshotsButton = ({
       console.error("Failed to calculate filtered count:", e);
       return 0;
     }
-  }, [dataFilter, forkFilter, repos]);
+  }, [repos]);
 
   // Update filtered count when dependencies change
   useEffect(() => {
@@ -89,10 +63,7 @@ export const BatchGenerateScreenshotsButton = ({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          dataFilter,
-          forkFilter,
-        }),
+        body: JSON.stringify({}),
       });
 
       let payload: {
@@ -100,7 +71,7 @@ export const BatchGenerateScreenshotsButton = ({
         message?: string;
         error?: string;
       } = {};
-      
+
       try {
         payload = await response.json();
       } catch (e) {
@@ -112,7 +83,7 @@ export const BatchGenerateScreenshotsButton = ({
       }
 
       setStatus("success");
-      
+
       // Refresh after a short delay to allow some processing
       setTimeout(() => {
         router.refresh();
@@ -129,7 +100,7 @@ export const BatchGenerateScreenshotsButton = ({
         setStatus("idle");
       }, 2000);
     }
-  }, [status, filteredCount, dataFilter, forkFilter, router]);
+  }, [status, filteredCount, router]);
 
   if (filteredCount === 0) {
     return null;
@@ -156,8 +127,8 @@ export const BatchGenerateScreenshotsButton = ({
         {status === "loading"
           ? "Queuing…"
           : status === "success"
-          ? ""
-          : `Generate ${filteredCount} Screenshot${filteredCount === 1 ? "" : "s"}`}
+            ? ""
+            : `Generate ${filteredCount} Screenshot${filteredCount === 1 ? "" : "s"}`}
       </Button>
     </div>
   );

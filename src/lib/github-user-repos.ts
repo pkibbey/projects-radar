@@ -9,6 +9,7 @@ export type GitHubUserRepo = {
   repo: string;
   displayName: string;
   isFork: boolean;
+  isPrivate: boolean;
   ownerUsername: string;
   isOwnedByUser: boolean; // Always true since we only fetch owned repos
 };
@@ -63,7 +64,7 @@ export const fetchUserRepositories = async (
   }
 
   const headers = createHeaders(token);
-  
+
   // First, fetch the authenticated user's login
   console.log("Fetching authenticated user information...");
   const userResponse = await fetch(`${GITHUB_API}/user`, { headers });
@@ -81,7 +82,7 @@ export const fetchUserRepositories = async (
 
   while (hasMore) {
     console.log(`Fetching page ${page} of repositories for authenticated user...`);
-    
+
     // Use type=owner to only get repos owned by the user (excludes forks, collaborative repos)
     const response = await fetch(
       `${GITHUB_API}/user/repos?per_page=100&page=${page}&sort=updated&direction=desc&type=owner`,
@@ -100,7 +101,7 @@ export const fetchUserRepositories = async (
         headers: Object.fromEntries(response.headers),
         body: errorBody,
       });
-      
+
       throw new Error(
         `Failed to fetch repositories: ${response.status} ${response.statusText}. Response: ${errorBody}`
       );
@@ -122,6 +123,7 @@ export const fetchUserRepositories = async (
         repo: repo.name,
         displayName: repo.name,
         isFork: repo.fork,
+        isPrivate: repo.private,
         ownerUsername: repoOwnerLogin,
         isOwnedByUser: true, // All repos from type=owner are owned by the user
       });
@@ -133,10 +135,10 @@ export const fetchUserRepositories = async (
   }
 
   console.log(`Total repositories fetched: ${repos.length}`);
-  
+
   // Cache the results
   cachedRepos = repos;
   cacheTimestamp = Date.now();
-  
+
   return repos;
 };

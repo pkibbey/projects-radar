@@ -73,7 +73,6 @@ export interface ProcessSingleRepositoryJobData {
 export interface ProcessBatchRepositoriesJobData {
   owner: string;
   token: string;
-  forkFilter?: "all" | "with-forks" | "without-forks";
 }
 
 export interface RefreshRepositoryIntelligenceJobData {
@@ -103,7 +102,6 @@ export interface GenerateSingleShortDescriptionJobData {
 
 export interface GenerateBatchShortDescriptionsJobData {
   token: string;
-  forkFilter?: "all" | "with-forks" | "without-forks";
 }
 
 export interface GenerateSingleReadmeJobData {
@@ -120,12 +118,10 @@ export interface GenerateSingleScreenshotJobData {
 
 export interface GenerateBatchReadmesJobData {
   token: string;
-  forkFilter?: "all" | "with-forks" | "without-forks";
 }
 
 export interface GenerateBatchScreenshotsJobData {
   token: string;
-  forkFilter?: "all" | "with-forks" | "without-forks";
 }
 
 // Queue instances

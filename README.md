@@ -1,4 +1,8 @@
-# Projects Radar
+<p align="center">
+  <img src="./logo.png" alt="Projects Radar" width="400" />
+</p>
+
+<h1 align="center">Projects Radar</h1>
 
 Projects Radar is a web dashboard that analyzes and processes GitHub repositories to generate README content, screenshots, short descriptions, and tech-stack insights. The app provides a repository listing UI, queue management, and background workers that run AI and scanner jobs.
 
